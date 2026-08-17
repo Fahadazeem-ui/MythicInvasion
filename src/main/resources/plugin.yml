@@ -1,21 +1,13 @@
 name: MythicInvasion
 
-version: ${version}
+version: '${version}'
 
 main: io.github.mindzard.mythicinvasion.MythicInvasionPlugin
 
-description: >
-  AI-powered dynamic mythic invasion and ecosystem engine
-  for Paper/Purpur Minecraft 1.21.11.
+description: AI-powered dynamic mythic invasion and ecosystem engine
 
 author: MindZard
 
 api-version: '1.21'
-
-load: POSTWORLD
-
-prefix: MythicInvasion
-
-website: https://github.com/mindzard/MythicInvasion
 
 folia-supported: false
