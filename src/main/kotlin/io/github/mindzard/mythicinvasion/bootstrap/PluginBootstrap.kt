@@ -6,6 +6,7 @@ import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemEngine
 import io.github.mindzard.mythicinvasion.concurrency.CoroutineEngine
 import io.github.mindzard.mythicinvasion.config.ConfigurationManager
 import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.PlayerSnapshotCollector
+import io.github.mindzard.mythicinvasion.infrastructure.paper.player.PlayerBehaviourListener
 
 class PluginBootstrap(
     private val plugin: MythicInvasionPlugin
@@ -61,6 +62,17 @@ class PluginBootstrap(
             ecosystemCoordinator
         )
 
+        /*
+         * Register the player behaviour listener with Bukkit/Paper.
+         *
+         * From this point onward Minecraft will send relevant
+         * player events to PlayerBehaviourListener.
+         */
+        plugin.server.pluginManager.registerEvents(
+            PlayerBehaviourListener(),
+            plugin
+        )
+
         ecosystemCoordinator.start()
 
         plugin.logger.info(
@@ -73,6 +85,10 @@ class PluginBootstrap(
 
         plugin.logger.info(
             "Player snapshot collector initialized."
+        )
+
+        plugin.logger.info(
+            "Player behaviour listener registered."
         )
 
         plugin.logger.info(
