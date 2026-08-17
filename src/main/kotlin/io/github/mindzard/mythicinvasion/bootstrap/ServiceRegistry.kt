@@ -1,7 +1,10 @@
 package io.github.mindzard.mythicinvasion.bootstrap
 
+import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemCoordinator
+import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemEngine
 import io.github.mindzard.mythicinvasion.concurrency.CoroutineEngine
 import io.github.mindzard.mythicinvasion.config.ConfigurationManager
+import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.PlayerSnapshotCollector
 
 class ServiceRegistry {
 
@@ -9,6 +12,15 @@ class ServiceRegistry {
         private set
 
     lateinit var coroutineEngine: CoroutineEngine
+        private set
+
+    lateinit var playerSnapshotCollector: PlayerSnapshotCollector
+        private set
+
+    lateinit var ecosystemEngine: EcosystemEngine
+        private set
+
+    lateinit var ecosystemCoordinator: EcosystemCoordinator
         private set
 
     fun registerConfigurationManager(
@@ -21,5 +33,23 @@ class ServiceRegistry {
         engine: CoroutineEngine
     ) {
         coroutineEngine = engine
+    }
+
+    fun registerPlayerSnapshotCollector(
+        collector: PlayerSnapshotCollector
+    ) {
+        playerSnapshotCollector = collector
+    }
+
+    fun registerEcosystemEngine(
+        engine: EcosystemEngine
+    ) {
+        ecosystemEngine = engine
+    }
+
+    fun registerEcosystemCoordinator(
+        coordinator: EcosystemCoordinator
+    ) {
+        ecosystemCoordinator = coordinator
     }
 }
