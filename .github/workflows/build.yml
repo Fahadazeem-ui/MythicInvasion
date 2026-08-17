@@ -1,0 +1,49 @@
+name: Build MythicInvasion
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Plugin
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.1'
+
+      - name: Build plugin
+        run: gradle build --no-daemon
+
+      - name: List build output
+        run: |
+          echo "=== Build Output ==="
+          find build/libs -maxdepth 1 -type f -printf '%f\n' || true
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MythicInvasion-plugin
+          path: build/libs/*.jar
+          if-no-files-found: error
