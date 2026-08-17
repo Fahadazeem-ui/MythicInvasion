@@ -1,36 +1,40 @@
 package io.github.mindzard.mythicinvasion.bootstrap
 
 import io.github.mindzard.mythicinvasion.MythicInvasionPlugin
+import io.github.mindzard.mythicinvasion.concurrency.CoroutineEngine
+import io.github.mindzard.mythicinvasion.config.ConfigurationManager
 
 class PluginBootstrap(
     private val plugin: MythicInvasionPlugin
 ) {
 
-    private var started: Boolean = false
+    fun start(): ServiceRegistry {
+        val registry = ServiceRegistry()
 
-    fun start() {
-        check(!started) {
-            "PluginBootstrap has already been started."
-        }
+        val configurationManager =
+            ConfigurationManager(plugin)
 
-        plugin.logger.info("Starting MythicInvasion bootstrap...")
+        configurationManager.load()
 
-        started = true
+        registry.registerConfigurationManager(
+            configurationManager
+        )
 
-        plugin.logger.info("MythicInvasion bootstrap started successfully.")
+        val coroutineEngine =
+            CoroutineEngine(plugin)
+
+        registry.registerCoroutineEngine(
+            coroutineEngine
+        )
+
+        plugin.logger.info(
+            "Configuration system initialized."
+        )
+
+        plugin.logger.info(
+            "Coroutine engine initialized."
+        )
+
+        return registry
     }
-
-    fun stop() {
-        if (!started) {
-            return
-        }
-
-        plugin.logger.info("Stopping MythicInvasion bootstrap...")
-
-        started = false
-
-        plugin.logger.info("MythicInvasion bootstrap stopped successfully.")
-    }
-
-    fun isStarted(): Boolean = started
 }
