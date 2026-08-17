@@ -1,0 +1,13 @@
+plugin:
+  debug: true
+
+ecosystem:
+  enabled: true
+
+  update-interval-ticks: 20
+
+ai:
+  enabled: false
+
+database:
+  enabled: false
