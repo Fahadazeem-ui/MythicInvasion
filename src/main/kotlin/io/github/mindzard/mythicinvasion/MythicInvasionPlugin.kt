@@ -18,9 +18,16 @@ class MythicInvasionPlugin : JavaPlugin() {
         try {
             services = PluginBootstrap(this).start()
 
-            logger.info("MythicInvasion foundation initialized successfully.")
-            logger.info("Ecosystem engine foundation is ready.")
+            logger.info(
+                "MythicInvasion foundation initialized successfully."
+            )
+
+            logger.info(
+                "Ecosystem engine started."
+            )
+
         } catch (exception: Exception) {
+
             logger.severe(
                 "Failed to initialize MythicInvasion."
             )
@@ -32,13 +39,28 @@ class MythicInvasionPlugin : JavaPlugin() {
     }
 
     override fun onDisable() {
-        logger.info("Shutting down MythicInvasion...")
+
+        logger.info(
+            "Shutting down MythicInvasion..."
+        )
 
         if (::services.isInitialized) {
+
             try {
+                services.ecosystemCoordinator.stop()
+
+                logger.info(
+                    "Ecosystem coordinator stopped."
+                )
+
                 services.coroutineEngine.shutdown()
-                logger.info("Coroutine engine stopped.")
+
+                logger.info(
+                    "Coroutine engine stopped."
+                )
+
             } catch (exception: Exception) {
+
                 logger.severe(
                     "Error while shutting down MythicInvasion services."
                 )
@@ -47,6 +69,8 @@ class MythicInvasionPlugin : JavaPlugin() {
             }
         }
 
-        logger.info("MythicInvasion shutdown completed.")
+        logger.info(
+            "MythicInvasion shutdown completed."
+        )
     }
 }
