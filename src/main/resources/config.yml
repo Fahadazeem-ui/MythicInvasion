@@ -15,6 +15,20 @@ society:
   villager-analysis-interval-millis: 10000
   social-interval-millis: 10000
 
+  villager-citizen-behaviour:
+    enabled: true
+    update-interval-millis: 5000
+    interaction-radius: 12.0
+    hostile-radius: 10.0
+    friendly-look-radius: 10.0
+    hostile-threat-threshold: 0.65
+    friendly-trust-threshold: 0.60
+    action-cooldown-millis: 5000
+
+  pillager-faction-intelligence:
+    enabled: true
+    update-interval-millis: 10000
+
 behaviour:
   enabled: true
   processing-interval-millis: 1000
