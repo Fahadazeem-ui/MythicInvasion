@@ -3,8 +3,8 @@ package io.github.mindzard.mythicinvasion.infrastructure.paper.world
 import io.github.mindzard.mythicinvasion.domain.world.WorldPopulationSnapshot
 import io.github.mindzard.mythicinvasion.domain.world.WorldSnapshot
 import org.bukkit.entity.Animals
-import org.bukkit.entity.Hostile
 import org.bukkit.entity.IronGolem
+import org.bukkit.entity.Monster
 import org.bukkit.entity.Pillager
 import org.bukkit.entity.Player
 import org.bukkit.entity.Villager
@@ -29,6 +29,12 @@ class WorldSnapshotCollector(
                 var passiveAnimalCount = 0
                 var ironGolemCount = 0
 
+                /*
+                 * World/entity access happens on the Minecraft
+                 * server thread. This collector is only called
+                 * through WorldIntelligenceCoordinator's
+                 * callSyncMethod().
+                 */
                 for (entity in world.entities) {
 
                     when (entity) {
@@ -49,7 +55,7 @@ class WorldSnapshotCollector(
                             ironGolemCount++
                         }
 
-                        is Hostile -> {
+                        is Monster -> {
                             hostileMobCount++
                         }
 
@@ -76,9 +82,12 @@ class WorldSnapshotCollector(
 
         return WorldSnapshot(
             timestampMillis = timestampMillis,
-            dayTime = referenceWorld?.time ?: 0L,
-            isDay = referenceWorld?.isDaytime ?: true,
-            isRaining = referenceWorld?.hasStorm() ?: false,
+            dayTime =
+                referenceWorld?.time ?: 0L,
+            isDay =
+                referenceWorld?.isDayTime() ?: true,
+            isRaining =
+                referenceWorld?.hasStorm() ?: false,
             populations = populations
         )
     }
