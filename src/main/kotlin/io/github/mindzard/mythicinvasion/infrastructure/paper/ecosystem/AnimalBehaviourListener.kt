@@ -34,9 +34,6 @@ class AnimalBehaviourListener(
         private const val DANGER_RADIUS =
             12.0
 
-        private const val PLAYER_RADIUS =
-            8.0
-
         private const val HERD_RADIUS =
             10.0
 
@@ -153,11 +150,13 @@ class AnimalBehaviourListener(
                 ) {
 
                     val owner =
-                        animal.owner
+                        animal.owner as? Player
 
                     if (
                         owner != null &&
-                        isValidPlayer(owner)
+                        isValidPlayer(
+                            owner
+                        )
                     ) {
 
                         approachOwner(
@@ -248,9 +247,8 @@ class AnimalBehaviourListener(
         event: EntityTargetLivingEntityEvent
     ) {
 
-        val animal =
-            event.entity as? Animals
-                ?: return
+        event.entity as? Animals
+            ?: return
 
         val target =
             event.target
@@ -258,7 +256,9 @@ class AnimalBehaviourListener(
 
         if (
             target is Player &&
-            !isValidPlayer(target)
+            !isValidPlayer(
+                target
+            )
         ) {
 
             event.target =
@@ -270,9 +270,6 @@ class AnimalBehaviourListener(
          * This listener only removes clearly invalid player
          * targets and supplies our own reactions in think().
          */
-        @Suppress("UNUSED_VARIABLE")
-        val ignoredAnimal =
-            animal
     }
 
     @EventHandler(
@@ -291,7 +288,9 @@ class AnimalBehaviourListener(
             event.player
 
         if (
-            !isValidPlayer(player)
+            !isValidPlayer(
+                player
+            )
         ) {
             return
         }
@@ -460,9 +459,11 @@ class AnimalBehaviourListener(
             ) <=
             9.0
         ) {
+
             animal.lookAt(
                 owner
             )
+
             return
         }
 
@@ -653,8 +654,8 @@ class AnimalBehaviourListener(
         now: Long
     ) {
 
-        dangerMemory.values.forEach {
-            memory ->
+        dangerMemory.values.forEach { memory ->
+
             decayMemory(
                 memory,
                 now
