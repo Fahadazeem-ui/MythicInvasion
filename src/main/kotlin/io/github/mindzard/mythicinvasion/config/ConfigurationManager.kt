@@ -80,6 +80,15 @@ class ConfigurationManager(
             .coerceAtLeast(2_000L)
     }
 
+    fun societySocialIntervalMillis(): Long {
+        return configuration
+            .getLong(
+                "society.social-interval-millis",
+                10_000L
+            )
+            .coerceAtLeast(2_000L)
+    }
+
     fun isBehaviourEnabled(): Boolean {
         return configuration.getBoolean(
             "behaviour.enabled",
