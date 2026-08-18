@@ -1,11 +1,13 @@
 package io.github.mindzard.mythicinvasion.application.behaviour
 
+import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceStore
 import io.github.mindzard.mythicinvasion.concurrency.CoroutineEngine
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.bukkit.plugin.java.JavaPlugin
+import java.util.logging.Level
 
 class BehaviourProcessor(
     private val plugin: JavaPlugin,
@@ -13,6 +15,7 @@ class BehaviourProcessor(
     private val buffer: BehaviourEventBuffer,
     private val profileStore: BehaviourProfileStore,
     private val featureEngine: BehaviourFeatureEngine,
+    private val intelligenceStore: BehaviourIntelligenceStore,
     private val processingIntervalMillis: () -> Long
 ) {
 
@@ -33,8 +36,8 @@ class BehaviourProcessor(
                         System.currentTimeMillis()
 
                     /*
-                     * Apply time decay even when a player has generated
-                     * no new events.
+                     * Update the weighted behaviour state even when
+                     * the player produces no new events.
                      */
                     profileStore.applyTimeDecay(
                         nowMillis
@@ -46,36 +49,33 @@ class BehaviourProcessor(
                         )
 
                     if (events.isNotEmpty()) {
-
-                        processBatch(
-                            events
-                        )
+                        processBatch(events)
                     }
 
                     /*
-                     * Recalculate every existing profile after decay.
-                     *
-                     * This ensures AI-facing features also reflect the
-                     * latest decayed state.
+                     * Recalculate current behaviour features.
                      */
                     profileStore.recalculateAllFeatures(
                         featureEngine
                     )
 
+                    /*
+                     * Build/update AI-facing intelligence profiles.
+                     */
+                    updateIntelligenceProfiles()
+
                     if (
                         plugin.logger.isLoggable(
-                            java.util.logging.Level.FINE
+                            Level.FINE
                         )
                     ) {
 
                         plugin.logger.fine(
                             "Behaviour cycle completed. " +
-                                "processedEvents=" +
-                                events.size +
-                                ", profiles=" +
-                                profileStore.snapshot().size +
-                                ", buffered=" +
-                                buffer.size()
+                                "processedEvents=${events.size}, " +
+                                "behaviourProfiles=${profileStore.snapshot().size}, " +
+                                "intelligenceProfiles=${intelligenceStore.snapshot().size}, " +
+                                "buffered=${buffer.size()}"
                         )
                     }
 
@@ -92,7 +92,7 @@ class BehaviourProcessor(
         processingJob = null
 
         /*
-         * Process any remaining events before shutdown.
+         * Process any events still waiting in memory.
          */
         val remainingEvents =
             buffer.drain(
@@ -100,7 +100,6 @@ class BehaviourProcessor(
             )
 
         if (remainingEvents.isNotEmpty()) {
-
             processBatch(
                 remainingEvents
             )
@@ -113,6 +112,8 @@ class BehaviourProcessor(
         profileStore.recalculateAllFeatures(
             featureEngine
         )
+
+        updateIntelligenceProfiles()
     }
 
     private fun processBatch(
@@ -122,9 +123,18 @@ class BehaviourProcessor(
     ) {
 
         for (event in events) {
+            profileStore.apply(event)
+        }
+    }
 
-            profileStore.apply(
-                event
+    private fun updateIntelligenceProfiles() {
+
+        val behaviourProfiles =
+            profileStore.snapshot()
+
+        for (profile in behaviourProfiles) {
+            intelligenceStore.update(
+                behaviourProfile = profile
             )
         }
     }
