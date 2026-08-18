@@ -130,6 +130,69 @@ class ConfigurationManager(
         )
     }
 
+    fun aiProvider(): String {
+        return configuration
+            .getString(
+                "ai.provider",
+                "gemini"
+            )
+            ?.trim()
+            ?.lowercase()
+            ?: "gemini"
+    }
+
+    fun aiModel(): String {
+        return configuration
+            .getString(
+                "ai.model",
+                "gemini-3.6-flash"
+            )
+            ?.trim()
+            ?.ifBlank {
+                "gemini-3.6-flash"
+            }
+            ?: "gemini-3.6-flash"
+    }
+
+    fun aiMinimumConfidence(): Double {
+        return configuration
+            .getDouble(
+                "ai.minimum-confidence",
+                0.65
+            )
+            .coerceIn(
+                0.0,
+                1.0
+            )
+    }
+
+    fun aiStrategyIntervalMillis(): Long {
+        return configuration
+            .getLong(
+                "ai.strategy-interval-millis",
+                60_000L
+            )
+            .coerceAtLeast(10_000L)
+    }
+
+    fun aiRequestTimeoutMillis(): Long {
+        return configuration
+            .getLong(
+                "ai.request-timeout-millis",
+                30_000L
+            )
+            .coerceAtLeast(1_000L)
+    }
+
+    fun aiMaxContextCharacters(): Int {
+        return configuration
+            .getInt(
+                "ai.max-context-characters",
+                12_000
+            )
+            .coerceAtLeast(1_000)
+    }
+
     fun isDatabaseEnabled(): Boolean {
         return configuration.getBoolean(
             "database.enabled",
