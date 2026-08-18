@@ -154,6 +154,18 @@ class ConfigurationManager(
             ?: "gemini-3.6-flash"
     }
 
+    fun aiApiKey(): String? {
+        return configuration
+            .getString(
+                "ai.api-key",
+                ""
+            )
+            ?.trim()
+            ?.takeIf {
+                it.isNotEmpty()
+            }
+    }
+
     fun aiMinimumConfidence(): Double {
         return configuration
             .getDouble(
