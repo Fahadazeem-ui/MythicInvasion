@@ -6,6 +6,8 @@ import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourProcesso
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourProfileStore
 import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemCoordinator
 import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemEngine
+import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceEngine
+import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceStore
 import io.github.mindzard.mythicinvasion.concurrency.CoroutineEngine
 import io.github.mindzard.mythicinvasion.config.ConfigurationManager
 import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.PlayerSnapshotCollector
@@ -37,6 +39,12 @@ class ServiceRegistry {
         private set
 
     lateinit var behaviourProcessor: BehaviourProcessor
+        private set
+
+    lateinit var behaviourIntelligenceEngine: BehaviourIntelligenceEngine
+        private set
+
+    lateinit var behaviourIntelligenceStore: BehaviourIntelligenceStore
         private set
 
     fun registerConfigurationManager(
@@ -91,5 +99,17 @@ class ServiceRegistry {
         processor: BehaviourProcessor
     ) {
         behaviourProcessor = processor
+    }
+
+    fun registerBehaviourIntelligenceEngine(
+        engine: BehaviourIntelligenceEngine
+    ) {
+        behaviourIntelligenceEngine = engine
+    }
+
+    fun registerBehaviourIntelligenceStore(
+        store: BehaviourIntelligenceStore
+    ) {
+        behaviourIntelligenceStore = store
     }
 }
