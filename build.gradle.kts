@@ -42,13 +42,20 @@ dependencies {
         "org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0"
     )
 
+    /*
+     * Official Google Gen AI Java SDK.
+     *
+     * The AI layer remains disabled by configuration until we
+     * explicitly enable it and provide GOOGLE_API_KEY.
+     */
+    implementation(
+        "com.google.genai:google-genai:1.63.0"
+    )
+
     compileOnly(
         "org.slf4j:slf4j-api:2.0.17"
     )
 
-    /*
-     * Kotlin/JVM + JUnit 6 test support.
-     */
     testImplementation(
         "org.junit.jupiter:junit-jupiter-api:6.0.3"
     )
@@ -120,10 +127,6 @@ tasks {
             "dev-all"
         )
 
-        /*
-         * INCLUDE is intentional here because Shadow's Kotlin module
-         * metadata transformer needs access to duplicate module metadata.
-         */
         duplicatesStrategy =
             DuplicatesStrategy.INCLUDE
 
