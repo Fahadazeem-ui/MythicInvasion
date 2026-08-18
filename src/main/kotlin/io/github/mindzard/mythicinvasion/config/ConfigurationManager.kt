@@ -255,113 +255,34 @@ class ConfigurationManager(
             )
     }
 
-    fun isVillagerCitizenBehaviourEnabled(): Boolean {
+    fun isPillagerFactionStrategyEnabled(): Boolean {
         return configuration.getBoolean(
-            "society.villager-citizen-behaviour.enabled",
+            "society.pillager-strategy.enabled",
             true
         )
     }
 
-    fun villagerCitizenUpdateIntervalMillis(): Long {
+    fun pillagerFactionStrategyIntervalMillis(): Long {
         return configuration
             .getLong(
-                "society.villager-citizen-behaviour.update-interval-millis",
-                5_000L
-            )
-            .coerceIn(
-                1_000L,
-                30_000L
-            )
-    }
-
-    fun villagerCitizenInteractionRadius(): Double {
-        return configuration
-            .getDouble(
-                "society.villager-citizen-behaviour.interaction-radius",
-                12.0
-            )
-            .coerceIn(
-                4.0,
-                32.0
-            )
-    }
-
-    fun villagerCitizenHostileRadius(): Double {
-        return configuration
-            .getDouble(
-                "society.villager-citizen-behaviour.hostile-radius",
-                10.0
-            )
-            .coerceIn(
-                4.0,
-                24.0
-            )
-    }
-
-    fun villagerCitizenFriendlyLookRadius(): Double {
-        return configuration
-            .getDouble(
-                "society.villager-citizen-behaviour.friendly-look-radius",
-                10.0
-            )
-            .coerceIn(
-                4.0,
-                24.0
-            )
-    }
-
-    fun villagerCitizenHostileThreatThreshold(): Double {
-        return configuration
-            .getDouble(
-                "society.villager-citizen-behaviour.hostile-threat-threshold",
-                0.65
-            )
-            .coerceIn(
-                0.1,
-                1.0
-            )
-    }
-
-    fun villagerCitizenFriendlyTrustThreshold(): Double {
-        return configuration
-            .getDouble(
-                "society.villager-citizen-behaviour.friendly-trust-threshold",
-                0.60
-            )
-            .coerceIn(
-                0.1,
-                1.0
-            )
-    }
-
-    fun villagerCitizenActionCooldownMillis(): Long {
-        return configuration
-            .getLong(
-                "society.villager-citizen-behaviour.action-cooldown-millis",
-                5_000L
-            )
-            .coerceIn(
-                1_000L,
-                30_000L
-            )
-    }
-
-    fun isPillagerFactionIntelligenceEnabled(): Boolean {
-        return configuration.getBoolean(
-            "society.pillager-faction-intelligence.enabled",
-            true
-        )
-    }
-
-    fun pillagerFactionUpdateIntervalMillis(): Long {
-        return configuration
-            .getLong(
-                "society.pillager-faction-intelligence.update-interval-millis",
+                "society.pillager-strategy.update-interval-millis",
                 10_000L
             )
             .coerceIn(
                 2_000L,
                 60_000L
+            )
+    }
+
+    fun pillagerAssignmentRadius(): Double {
+        return configuration
+            .getDouble(
+                "society.pillager-strategy.assignment-radius",
+                128.0
+            )
+            .coerceIn(
+                32.0,
+                256.0
             )
     }
 
