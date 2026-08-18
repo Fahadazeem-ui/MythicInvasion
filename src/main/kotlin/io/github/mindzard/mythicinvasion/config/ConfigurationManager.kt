@@ -55,6 +55,22 @@ class ConfigurationManager(
             .coerceAtLeast(1_000L)
     }
 
+    fun isSocietyEnabled(): Boolean {
+        return configuration.getBoolean(
+            "society.enabled",
+            true
+        )
+    }
+
+    fun societyObservationIntervalMillis(): Long {
+        return configuration
+            .getLong(
+                "society.observation-interval-millis",
+                10_000L
+            )
+            .coerceAtLeast(2_000L)
+    }
+
     fun isBehaviourEnabled(): Boolean {
         return configuration.getBoolean(
             "behaviour.enabled",
