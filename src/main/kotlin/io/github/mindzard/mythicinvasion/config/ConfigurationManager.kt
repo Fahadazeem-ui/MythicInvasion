@@ -36,9 +36,7 @@ class ConfigurationManager(
                 "ecosystem.update-interval-ticks",
                 20L
             )
-            .coerceAtLeast(
-                1L
-            )
+            .coerceAtLeast(1L)
     }
 
     fun isWorldIntelligenceEnabled(): Boolean {
@@ -54,9 +52,7 @@ class ConfigurationManager(
                 "world-intelligence.update-interval-millis",
                 5_000L
             )
-            .coerceAtLeast(
-                1_000L
-            )
+            .coerceAtLeast(1_000L)
     }
 
     fun isSocietyEnabled(): Boolean {
@@ -72,9 +68,7 @@ class ConfigurationManager(
                 "society.observation-interval-millis",
                 10_000L
             )
-            .coerceAtLeast(
-                2_000L
-            )
+            .coerceAtLeast(2_000L)
     }
 
     fun villagerAnalysisIntervalMillis(): Long {
@@ -83,9 +77,7 @@ class ConfigurationManager(
                 "society.villager-analysis-interval-millis",
                 10_000L
             )
-            .coerceAtLeast(
-                2_000L
-            )
+            .coerceAtLeast(2_000L)
     }
 
     fun societySocialIntervalMillis(): Long {
@@ -94,9 +86,7 @@ class ConfigurationManager(
                 "society.social-interval-millis",
                 10_000L
             )
-            .coerceAtLeast(
-                2_000L
-            )
+            .coerceAtLeast(2_000L)
     }
 
     fun isBehaviourEnabled(): Boolean {
@@ -112,9 +102,7 @@ class ConfigurationManager(
                 "behaviour.processing-interval-millis",
                 1_000L
             )
-            .coerceAtLeast(
-                50L
-            )
+            .coerceAtLeast(50L)
     }
 
     fun behaviourDecayHalfLifeMinutes(): Double {
@@ -123,9 +111,7 @@ class ConfigurationManager(
                 "behaviour.decay.half-life-minutes",
                 30.0
             )
-            .coerceAtLeast(
-                0.1
-            )
+            .coerceAtLeast(0.1)
     }
 
     fun behaviourDecayHalfLifeMillis(): Long {
@@ -134,9 +120,7 @@ class ConfigurationManager(
                 60_000.0
             )
             .toLong()
-            .coerceAtLeast(
-                1L
-            )
+            .coerceAtLeast(1L)
     }
 
     fun isAiEnabled(): Boolean {
@@ -200,9 +184,7 @@ class ConfigurationManager(
                 "ai.strategy-interval-millis",
                 60_000L
             )
-            .coerceAtLeast(
-                10_000L
-            )
+            .coerceAtLeast(10_000L)
     }
 
     fun aiRequestTimeoutMillis(): Long {
@@ -211,9 +193,7 @@ class ConfigurationManager(
                 "ai.request-timeout-millis",
                 30_000L
             )
-            .coerceAtLeast(
-                1_000L
-            )
+            .coerceAtLeast(1_000L)
     }
 
     fun aiMaxContextCharacters(): Int {
@@ -222,9 +202,7 @@ class ConfigurationManager(
                 "ai.max-context-characters",
                 12_000
             )
-            .coerceAtLeast(
-                1_000
-            )
+            .coerceAtLeast(1_000)
     }
 
     fun isAdaptiveBehaviourEnabled(): Boolean {
@@ -274,6 +252,116 @@ class ConfigurationManager(
             .coerceIn(
                 1_000L,
                 30_000L
+            )
+    }
+
+    fun isVillagerCitizenBehaviourEnabled(): Boolean {
+        return configuration.getBoolean(
+            "society.villager-citizen-behaviour.enabled",
+            true
+        )
+    }
+
+    fun villagerCitizenUpdateIntervalMillis(): Long {
+        return configuration
+            .getLong(
+                "society.villager-citizen-behaviour.update-interval-millis",
+                5_000L
+            )
+            .coerceIn(
+                1_000L,
+                30_000L
+            )
+    }
+
+    fun villagerCitizenInteractionRadius(): Double {
+        return configuration
+            .getDouble(
+                "society.villager-citizen-behaviour.interaction-radius",
+                12.0
+            )
+            .coerceIn(
+                4.0,
+                32.0
+            )
+    }
+
+    fun villagerCitizenHostileRadius(): Double {
+        return configuration
+            .getDouble(
+                "society.villager-citizen-behaviour.hostile-radius",
+                10.0
+            )
+            .coerceIn(
+                4.0,
+                24.0
+            )
+    }
+
+    fun villagerCitizenFriendlyLookRadius(): Double {
+        return configuration
+            .getDouble(
+                "society.villager-citizen-behaviour.friendly-look-radius",
+                10.0
+            )
+            .coerceIn(
+                4.0,
+                24.0
+            )
+    }
+
+    fun villagerCitizenHostileThreatThreshold(): Double {
+        return configuration
+            .getDouble(
+                "society.villager-citizen-behaviour.hostile-threat-threshold",
+                0.65
+            )
+            .coerceIn(
+                0.1,
+                1.0
+            )
+    }
+
+    fun villagerCitizenFriendlyTrustThreshold(): Double {
+        return configuration
+            .getDouble(
+                "society.villager-citizen-behaviour.friendly-trust-threshold",
+                0.60
+            )
+            .coerceIn(
+                0.1,
+                1.0
+            )
+    }
+
+    fun villagerCitizenActionCooldownMillis(): Long {
+        return configuration
+            .getLong(
+                "society.villager-citizen-behaviour.action-cooldown-millis",
+                5_000L
+            )
+            .coerceIn(
+                1_000L,
+                30_000L
+            )
+    }
+
+    fun isPillagerFactionIntelligenceEnabled(): Boolean {
+        return configuration.getBoolean(
+            "society.pillager-faction-intelligence.enabled",
+            true
+        )
+    }
+
+    fun pillagerFactionUpdateIntervalMillis(): Long {
+        return configuration
+            .getLong(
+                "society.pillager-faction-intelligence.update-interval-millis",
+                10_000L
+            )
+            .coerceIn(
+                2_000L,
+                60_000L
             )
     }
 
