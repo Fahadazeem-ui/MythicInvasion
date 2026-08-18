@@ -8,6 +8,8 @@ import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourProcesso
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourProfileStore
 import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemCoordinator
 import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemEngine
+import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceEngine
+import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceStore
 import io.github.mindzard.mythicinvasion.concurrency.CoroutineEngine
 import io.github.mindzard.mythicinvasion.config.ConfigurationManager
 import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.PlayerSnapshotCollector
@@ -111,6 +113,26 @@ class PluginBootstrap(
             behaviourFeatureEngine
         )
 
+        /*
+         * Intelligence subsystem.
+         */
+
+        val behaviourIntelligenceEngine =
+            BehaviourIntelligenceEngine()
+
+        registry.registerBehaviourIntelligenceEngine(
+            behaviourIntelligenceEngine
+        )
+
+        val behaviourIntelligenceStore =
+            BehaviourIntelligenceStore(
+                behaviourIntelligenceEngine
+            )
+
+        registry.registerBehaviourIntelligenceStore(
+            behaviourIntelligenceStore
+        )
+
         val behaviourProcessor =
             BehaviourProcessor(
                 plugin = plugin,
@@ -118,6 +140,7 @@ class PluginBootstrap(
                 buffer = behaviourEventBuffer,
                 profileStore = behaviourProfileStore,
                 featureEngine = behaviourFeatureEngine,
+                intelligenceStore = behaviourIntelligenceStore,
                 processingIntervalMillis = {
                     configurationManager
                         .behaviourProcessingIntervalMillis()
@@ -187,6 +210,14 @@ class PluginBootstrap(
 
         plugin.logger.info(
             "Behaviour feature engine initialized."
+        )
+
+        plugin.logger.info(
+            "Behaviour intelligence engine initialized."
+        )
+
+        plugin.logger.info(
+            "Behaviour intelligence store initialized."
         )
 
         plugin.logger.info(
