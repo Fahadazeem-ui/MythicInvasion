@@ -37,7 +37,9 @@ class MythicInvasionPlugin : JavaPlugin() {
                 "=========================================="
             )
 
-        } catch (exception: Exception) {
+        } catch (
+            exception: Exception
+        ) {
 
             logger.severe(
                 "MythicInvasion failed to start."
@@ -72,6 +74,10 @@ class MythicInvasionPlugin : JavaPlugin() {
                         .aiStrategyCoordinator
                         .stop()
                 }
+
+                services.villagerCitizenCoordinator.stop()
+
+                services.pillagerFactionCoordinator.stop()
 
                 services.behaviourProcessor.stop()
 
