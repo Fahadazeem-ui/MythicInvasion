@@ -63,7 +63,29 @@ class MythicInvasionPlugin : JavaPlugin() {
 
             try {
 
+                /*
+                 * Stop AI first so no new strategic request can
+                 * begin during the rest of shutdown.
+                 */
+                if (
+                    services
+                        .isAiStrategyCoordinatorInitialized()
+                ) {
+
+                    services
+                        .aiStrategyCoordinator
+                        .stop()
+
+                    logger.info(
+                        "AI strategy coordinator stopped."
+                    )
+                }
+
                 services.behaviourProcessor.stop()
+
+                logger.info(
+                    "Behaviour processor stopped."
+                )
 
                 services.settlementSocialCoordinator.stop()
 
