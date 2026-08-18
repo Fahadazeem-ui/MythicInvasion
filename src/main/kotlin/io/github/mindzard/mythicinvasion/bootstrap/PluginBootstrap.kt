@@ -10,9 +10,13 @@ import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemCoordina
 import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemEngine
 import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceEngine
 import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceStore
+import io.github.mindzard.mythicinvasion.application.world.WorldIntelligenceCoordinator
+import io.github.mindzard.mythicinvasion.application.world.WorldIntelligenceEngine
+import io.github.mindzard.mythicinvasion.application.world.WorldStateStore
 import io.github.mindzard.mythicinvasion.concurrency.CoroutineEngine
 import io.github.mindzard.mythicinvasion.config.ConfigurationManager
 import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.PlayerSnapshotCollector
+import io.github.mindzard.mythicinvasion.infrastructure.paper.world.WorldSnapshotCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.player.PlayerBehaviourListener
 
 class PluginBootstrap(
@@ -113,10 +117,6 @@ class PluginBootstrap(
             behaviourFeatureEngine
         )
 
-        /*
-         * Intelligence subsystem.
-         */
-
         val behaviourIntelligenceEngine =
             BehaviourIntelligenceEngine()
 
@@ -152,7 +152,51 @@ class PluginBootstrap(
         )
 
         /*
-         * Register Minecraft event listeners.
+         * World intelligence subsystem.
+         */
+
+        val worldSnapshotCollector =
+            WorldSnapshotCollector(
+                plugin
+            )
+
+        registry.registerWorldSnapshotCollector(
+            worldSnapshotCollector
+        )
+
+        val worldIntelligenceEngine =
+            WorldIntelligenceEngine()
+
+        registry.registerWorldIntelligenceEngine(
+            worldIntelligenceEngine
+        )
+
+        val worldStateStore =
+            WorldStateStore()
+
+        registry.registerWorldStateStore(
+            worldStateStore
+        )
+
+        val worldIntelligenceCoordinator =
+            WorldIntelligenceCoordinator(
+                plugin = plugin,
+                coroutineEngine = coroutineEngine,
+                collector = worldSnapshotCollector,
+                engine = worldIntelligenceEngine,
+                stateStore = worldStateStore,
+                updateIntervalMillis = {
+                    configurationManager
+                        .worldIntelligenceUpdateIntervalMillis()
+                }
+            )
+
+        registry.registerWorldIntelligenceCoordinator(
+            worldIntelligenceCoordinator
+        )
+
+        /*
+         * Minecraft listeners.
          */
         plugin.server.pluginManager.registerEvents(
             PlayerBehaviourListener(
@@ -162,13 +206,12 @@ class PluginBootstrap(
         )
 
         /*
-         * Start background processors.
+         * Start enabled systems.
          */
         if (
             configurationManager
                 .isBehaviourEnabled()
         ) {
-
             behaviourProcessor.start()
         }
 
@@ -176,8 +219,14 @@ class PluginBootstrap(
             configurationManager
                 .isEcosystemEnabled()
         ) {
-
             ecosystemCoordinator.start()
+        }
+
+        if (
+            configurationManager
+                .isWorldIntelligenceEnabled()
+        ) {
+            worldIntelligenceCoordinator.start()
         }
 
         plugin.logger.info(
@@ -189,7 +238,7 @@ class PluginBootstrap(
         )
 
         plugin.logger.info(
-            "Player snapshot collector initialized."
+            "Behaviour systems initialized."
         )
 
         plugin.logger.info(
@@ -197,35 +246,15 @@ class PluginBootstrap(
         )
 
         plugin.logger.info(
-            "Behaviour event buffer initialized."
+            "World snapshot collector initialized."
         )
 
         plugin.logger.info(
-            "Behaviour decay engine initialized."
+            "World intelligence engine initialized."
         )
 
         plugin.logger.info(
-            "Behaviour profile store initialized."
-        )
-
-        plugin.logger.info(
-            "Behaviour feature engine initialized."
-        )
-
-        plugin.logger.info(
-            "Behaviour intelligence engine initialized."
-        )
-
-        plugin.logger.info(
-            "Behaviour intelligence store initialized."
-        )
-
-        plugin.logger.info(
-            "Behaviour processor initialized."
-        )
-
-        plugin.logger.info(
-            "Player behaviour listener registered."
+            "World intelligence coordinator started."
         )
 
         return registry
