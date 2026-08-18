@@ -26,72 +26,44 @@ repositories {
 
 dependencies {
 
-    /*
-     * Paper development bundle for Minecraft/Paper 1.21.11.
-     */
     paperweight.paperDevBundle(
         "1.21.11-R0.1-SNAPSHOT"
     )
 
-    /*
-     * Kotlin runtime.
-     */
     implementation(
         kotlin("stdlib")
     )
 
-    /*
-     * Kotlin coroutines.
-     *
-     * Used for asynchronous application-level work.
-     * Bukkit/Paper API access remains on the correct server thread.
-     */
     implementation(
         "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2"
     )
 
-    /*
-     * Kotlin serialization.
-     */
     implementation(
         "org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0"
     )
 
-    /*
-     * SLF4J API supplied by the server environment.
-     */
     compileOnly(
         "org.slf4j:slf4j-api:2.0.17"
     )
 
     /*
-     * ============================================================
-     * TESTING
-     * ============================================================
-     *
-     * Keep the testing dependencies explicit.
-     *
-     * Previously we relied on kotlin("test") plus the aggregate
-     * JUnit dependency. The GitHub build was not exposing the
-     * required test API to compileTestKotlin correctly.
-     *
-     * Explicit JUnit API + engine removes that ambiguity.
+     * Kotlin/JVM + JUnit 6 test support.
      */
-
     testImplementation(
-        "org.junit.jupiter:junit-jupiter-api:6.0.0"
+        "org.junit.jupiter:junit-jupiter-api:6.0.3"
     )
 
     testRuntimeOnly(
-        "org.junit.jupiter:junit-jupiter-engine:6.0.0"
+        "org.junit.jupiter:junit-jupiter-engine:6.0.3"
+    )
+
+    testRuntimeOnly(
+        "org.junit.platform:junit-platform-launcher"
     )
 }
 
 kotlin {
 
-    /*
-     * Minecraft/Paper 1.21.11 runs on Java 21.
-     */
     jvmToolchain(21)
 
     compilerOptions {
@@ -99,7 +71,7 @@ kotlin {
             JvmTarget.JVM_21
         )
 
-        freeCompilerArgs.addAll(
+        freeCompilerArgs.add(
             "-Xjsr305=strict"
         )
     }
@@ -118,9 +90,6 @@ java {
 
 tasks {
 
-    /*
-     * Kotlin compilation.
-     */
     compileKotlin {
         compilerOptions {
             jvmTarget.set(
@@ -129,32 +98,18 @@ tasks {
         }
     }
 
-    /*
-     * Java compilation.
-     */
     compileJava {
         options.release.set(21)
     }
 
-    /*
-     * JUnit 5/6 platform.
-     *
-     * JUnit Jupiter tests run through the JUnit Platform.
-     */
     withType<Test>().configureEach {
         useJUnitPlatform()
     }
 
-    /*
-     * The normal JAR is not the deployment artifact.
-     */
     jar {
         enabled = false
     }
 
-    /*
-     * Shadow JAR.
-     */
     named<ShadowJar>("shadowJar") {
 
         archiveBaseName.set(
@@ -165,30 +120,24 @@ tasks {
             "dev-all"
         )
 
-        duplicatesStrategy =
-            DuplicatesStrategy.EXCLUDE
-
         /*
-         * Relocate coroutine packages to prevent
-         * dependency collisions with other plugins.
+         * INCLUDE is intentional here because Shadow's Kotlin module
+         * metadata transformer needs access to duplicate module metadata.
          */
+        duplicatesStrategy =
+            DuplicatesStrategy.INCLUDE
+
         relocate(
             "kotlinx.coroutines",
             "io.github.mindzard.mythicinvasion.libs.coroutines"
         )
 
-        /*
-         * Relocate Kotlin serialization packages.
-         */
         relocate(
             "kotlinx.serialization",
             "io.github.mindzard.mythicinvasion.libs.serialization"
         )
     }
 
-    /*
-     * Make assemble produce the shaded artifact.
-     */
     assemble {
         dependsOn(
             named<ShadowJar>("shadowJar")
@@ -196,12 +145,6 @@ tasks {
     }
 }
 
-/*
- * Paperweight reobfuscation.
- *
- * Shadow JAR must exist before the reobfuscation lifecycle
- * completes.
- */
 tasks.named("reobfJar") {
     dependsOn(
         tasks.named<ShadowJar>("shadowJar")
