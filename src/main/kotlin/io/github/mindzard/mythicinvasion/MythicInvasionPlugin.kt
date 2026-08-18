@@ -64,39 +64,17 @@ class MythicInvasionPlugin : JavaPlugin() {
 
                 services.behaviourProcessor.stop()
 
-                logger.info(
-                    "Behaviour processor stopped."
-                )
+                services.villagerRelationshipCoordinator.stop()
 
                 services.villagerSocietyCoordinator.stop()
 
-                logger.info(
-                    "Villager society coordinator stopped."
-                )
-
                 services.settlementObservationCoordinator.stop()
-
-                logger.info(
-                    "Settlement observation coordinator stopped."
-                )
 
                 services.worldIntelligenceCoordinator.stop()
 
-                logger.info(
-                    "World intelligence coordinator stopped."
-                )
-
                 services.ecosystemCoordinator.stop()
 
-                logger.info(
-                    "Ecosystem coordinator stopped."
-                )
-
                 services.coroutineEngine.shutdown()
-
-                logger.info(
-                    "Coroutine engine stopped."
-                )
 
                 services.behaviourProfileStore.clear()
 
@@ -104,11 +82,13 @@ class MythicInvasionPlugin : JavaPlugin() {
 
                 services.behaviourIntelligenceStore.clear()
 
-                services.worldStateStore.reset()
+                services.villagerRelationshipStore.clear()
+
+                services.villagerSocietyStore.clear()
 
                 services.societyStateStore.reset()
 
-                services.villagerSocietyStore.clear()
+                services.worldStateStore.reset()
 
                 logger.info(
                     "All in-memory intelligence state cleared."
