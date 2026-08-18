@@ -14,6 +14,9 @@ import io.github.mindzard.mythicinvasion.application.society.FactionRelationServ
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationCoordinator
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationEngine
 import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
+import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyCoordinator
+import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyEngine
+import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyStore
 import io.github.mindzard.mythicinvasion.application.world.WorldIntelligenceCoordinator
 import io.github.mindzard.mythicinvasion.application.world.WorldIntelligenceEngine
 import io.github.mindzard.mythicinvasion.application.world.WorldStateStore
@@ -23,6 +26,7 @@ import io.github.mindzard.mythicinvasion.infrastructure.paper.command.SocietyDeb
 import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.PlayerSnapshotCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.player.PlayerBehaviourListener
 import io.github.mindzard.mythicinvasion.infrastructure.paper.society.SettlementObservationCollector
+import io.github.mindzard.mythicinvasion.infrastructure.paper.society.VillagerObservationCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.world.WorldSnapshotCollector
 
 class PluginBootstrap(
@@ -35,9 +39,7 @@ class PluginBootstrap(
             ServiceRegistry()
 
         val configurationManager =
-            ConfigurationManager(
-                plugin
-            )
+            ConfigurationManager(plugin)
 
         configurationManager.load()
 
@@ -46,31 +48,25 @@ class PluginBootstrap(
         )
 
         val coroutineEngine =
-            CoroutineEngine(
-                plugin
-            )
+            CoroutineEngine(plugin)
 
         registry.registerCoroutineEngine(
             coroutineEngine
         )
 
         /*
-         * Ecosystem subsystem.
+         * Ecosystem.
          */
 
         val playerSnapshotCollector =
-            PlayerSnapshotCollector(
-                plugin
-            )
+            PlayerSnapshotCollector(plugin)
 
         registry.registerPlayerSnapshotCollector(
             playerSnapshotCollector
         )
 
         val ecosystemEngine =
-            EcosystemEngine(
-                plugin
-            )
+            EcosystemEngine(plugin)
 
         registry.registerEcosystemEngine(
             ecosystemEngine
@@ -94,7 +90,7 @@ class PluginBootstrap(
         )
 
         /*
-         * Behaviour subsystem.
+         * Behaviour.
          */
 
         val behaviourEventBuffer =
@@ -162,13 +158,11 @@ class PluginBootstrap(
         )
 
         /*
-         * World intelligence subsystem.
+         * World intelligence.
          */
 
         val worldSnapshotCollector =
-            WorldSnapshotCollector(
-                plugin
-            )
+            WorldSnapshotCollector(plugin)
 
         registry.registerWorldSnapshotCollector(
             worldSnapshotCollector
@@ -206,13 +200,11 @@ class PluginBootstrap(
         )
 
         /*
-         * Society subsystem.
+         * Settlement observation.
          */
 
         val settlementObservationCollector =
-            SettlementObservationCollector(
-                plugin
-            )
+            SettlementObservationCollector(plugin)
 
         registry.registerSettlementObservationCollector(
             settlementObservationCollector
@@ -260,6 +252,53 @@ class PluginBootstrap(
         )
 
         /*
+         * Villager society.
+         */
+
+        val villagerObservationCollector =
+            VillagerObservationCollector(plugin)
+
+        registry.registerVillagerObservationCollector(
+            villagerObservationCollector
+        )
+
+        val villagerSocietyEngine =
+            VillagerSocietyEngine()
+
+        registry.registerVillagerSocietyEngine(
+            villagerSocietyEngine
+        )
+
+        val villagerSocietyStore =
+            VillagerSocietyStore()
+
+        registry.registerVillagerSocietyStore(
+            villagerSocietyStore
+        )
+
+        val villagerSocietyCoordinator =
+            VillagerSocietyCoordinator(
+                plugin = plugin,
+                coroutineEngine = coroutineEngine,
+                collector =
+                    villagerObservationCollector,
+                engine =
+                    villagerSocietyEngine,
+                stateStore =
+                    societyStateStore,
+                societyStore =
+                    villagerSocietyStore,
+                updateIntervalMillis = {
+                    configurationManager
+                        .villagerAnalysisIntervalMillis()
+                }
+            )
+
+        registry.registerVillagerSocietyCoordinator(
+            villagerSocietyCoordinator
+        )
+
+        /*
          * Minecraft event listeners.
          */
 
@@ -274,13 +313,12 @@ class PluginBootstrap(
          * Debug command.
          */
 
-        plugin.getCommand(
-            "society"
-        )?.setExecutor(
-            SocietyDebugCommand(
-                societyStateStore
+        plugin.getCommand("society")
+            ?.setExecutor(
+                SocietyDebugCommand(
+                    societyStateStore
+                )
             )
-        )
 
         /*
          * Start enabled systems.
@@ -312,6 +350,7 @@ class PluginBootstrap(
                 .isSocietyEnabled()
         ) {
             settlementObservationCoordinator.start()
+            villagerSocietyCoordinator.start()
         }
 
         plugin.logger.info(
