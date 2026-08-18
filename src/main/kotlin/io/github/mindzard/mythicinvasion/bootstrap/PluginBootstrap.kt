@@ -4,6 +4,9 @@ import io.github.mindzard.mythicinvasion.MythicInvasionPlugin
 import io.github.mindzard.mythicinvasion.application.ai.AiContextAssembler
 import io.github.mindzard.mythicinvasion.application.ai.AiDecisionValidator
 import io.github.mindzard.mythicinvasion.application.ai.AiStrategyCoordinator
+import io.github.mindzard.mythicinvasion.application.ai.StrategyActionParser
+import io.github.mindzard.mythicinvasion.application.ai.StrategyCooldownStore
+import io.github.mindzard.mythicinvasion.application.ai.StrategyExecutionState
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourDecayEngine
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourEventBuffer
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourFeatureEngine
@@ -32,6 +35,7 @@ import io.github.mindzard.mythicinvasion.application.world.WorldStateStore
 import io.github.mindzard.mythicinvasion.concurrency.CoroutineEngine
 import io.github.mindzard.mythicinvasion.config.ConfigurationManager
 import io.github.mindzard.mythicinvasion.infrastructure.ai.GeminiStrategyClient
+import io.github.mindzard.mythicinvasion.infrastructure.paper.ai.HostileMobStrategyListener
 import io.github.mindzard.mythicinvasion.infrastructure.paper.command.SocietyDebugCommand
 import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.PlayerSnapshotCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.player.PlayerBehaviourListener
@@ -351,8 +355,29 @@ class PluginBootstrap(
         )
 
         /*
-         * AI STRATEGY LAYER
+         * AI strategy runtime.
          */
+
+        val strategyExecutionState =
+            StrategyExecutionState()
+
+        registry.registerStrategyExecutionState(
+            strategyExecutionState
+        )
+
+        val strategyActionParser =
+            StrategyActionParser()
+
+        registry.registerStrategyActionParser(
+            strategyActionParser
+        )
+
+        val strategyCooldownStore =
+            StrategyCooldownStore()
+
+        registry.registerStrategyCooldownStore(
+            strategyCooldownStore
+        )
 
         if (
             configurationManager.isAiEnabled() &&
@@ -361,8 +386,7 @@ class PluginBootstrap(
 
             val aiContextAssembler =
                 AiContextAssembler(
-                    worldStateStore =
-                        worldStateStore,
+                    worldStateStore = worldStateStore,
                     behaviourIntelligenceStore =
                         behaviourIntelligenceStore,
                     societyStateStore =
@@ -403,10 +427,16 @@ class PluginBootstrap(
             val aiStrategyCoordinator =
                 AiStrategyCoordinator(
                     plugin = plugin,
-                    coroutineEngine = coroutineEngine,
-                    contextAssembler = aiContextAssembler,
-                    geminiClient = geminiStrategyClient,
-                    validator = aiDecisionValidator,
+                    coroutineEngine =
+                        coroutineEngine,
+                    contextAssembler =
+                        aiContextAssembler,
+                    geminiClient =
+                        geminiStrategyClient,
+                    validator =
+                        aiDecisionValidator,
+                    executionState =
+                        strategyExecutionState,
                     updateIntervalMillis = {
                         configurationManager
                             .aiStrategyIntervalMillis()
@@ -421,20 +451,25 @@ class PluginBootstrap(
             )
 
             aiStrategyCoordinator.start()
-
-            plugin.logger.info(
-                "Gemini AI strategy subsystem initialized."
-            )
-
-        } else {
-
-            plugin.logger.info(
-                "Gemini AI strategy subsystem is disabled."
-            )
         }
 
         /*
-         * Minecraft events
+         * Register adaptive hostile-mob runtime.
+         */
+        plugin.server.pluginManager.registerEvents(
+            HostileMobStrategyListener(
+                executionState =
+                    strategyExecutionState,
+                actionParser =
+                    strategyActionParser,
+                cooldownStore =
+                    strategyCooldownStore
+            ),
+            plugin
+        )
+
+        /*
+         * Existing behaviour listener.
          */
 
         plugin.server.pluginManager.registerEvents(
@@ -445,20 +480,22 @@ class PluginBootstrap(
         )
 
         /*
-         * Debug command
+         * Debug command.
          */
 
         plugin.getCommand(
             "society"
         )?.setExecutor(
             SocietyDebugCommand(
-                societyStateStore = societyStateStore,
-                socialStore = settlementSocialStore
+                societyStateStore =
+                    societyStateStore,
+                socialStore =
+                    settlementSocialStore
             )
         )
 
         /*
-         * Start systems
+         * Start background systems.
          */
 
         if (
