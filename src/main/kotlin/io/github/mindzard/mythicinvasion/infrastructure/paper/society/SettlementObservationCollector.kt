@@ -1,6 +1,7 @@
 package io.github.mindzard.mythicinvasion.infrastructure.paper.society
 
 import io.github.mindzard.mythicinvasion.domain.society.SettlementObservation
+import org.bukkit.Location
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.entity.Entity
 import org.bukkit.entity.IronGolem
@@ -13,10 +14,10 @@ class SettlementObservationCollector(
 ) {
 
     companion object {
-        private const val GRID_SIZE = 48
-        private const val MAX_CLUSTER_DISTANCE = 40.0
+        private const val GRID_SIZE = 64
+        private const val MAX_CLUSTER_DISTANCE = 72.0
         private const val MIN_SETTLEMENT_POPULATION = 2
-        private const val SETTLEMENT_RADIUS = 48
+        private const val SETTLEMENT_RADIUS = 64
 
         private const val CLUSTER_KEY_DIVISOR = 1_000_000
     }
@@ -53,8 +54,8 @@ class SettlementObservationCollector(
                     .toList()
 
             val clusters =
-                clusterVillagers(
-                    villagers
+                mergeNearbyClusters(
+                    clusterVillagers(villagers)
                 )
 
             for (cluster in clusters) {
@@ -326,6 +327,81 @@ class SettlementObservationCollector(
         }
 
         return clusters.values.toList()
+    }
+
+
+    private fun mergeNearbyClusters(
+        clusters: List<List<Villager>>
+    ): List<List<Villager>> {
+
+        if (clusters.size <= 1) {
+            return clusters
+        }
+
+        val working =
+            clusters
+                .map { it.toMutableList() }
+                .toMutableList()
+
+        var merged = true
+
+        while (merged) {
+            merged = false
+
+            outer@ for (firstIndex in working.indices) {
+                val first = working[firstIndex]
+                val firstCenter =
+                    clusterCenter(first)
+
+                for (secondIndex in firstIndex + 1 until working.size) {
+                    val second =
+                        working[secondIndex]
+
+                    val secondCenter =
+                        clusterCenter(second)
+
+                    if (
+                        distanceSquared(
+                            firstCenter.x,
+                            firstCenter.y,
+                            firstCenter.z,
+                            secondCenter.x,
+                            secondCenter.y,
+                            secondCenter.z
+                        ) <=
+                        MAX_CLUSTER_DISTANCE *
+                        MAX_CLUSTER_DISTANCE
+                    ) {
+                        first.addAll(second)
+                        working.removeAt(secondIndex)
+                        merged = true
+                        break@outer
+                    }
+                }
+            }
+        }
+
+        return working
+    }
+
+    private fun clusterCenter(
+        villagers: List<Villager>
+    ): Location {
+        val first =
+            villagers.first().location
+
+        return Location(
+            first.world,
+            villagers
+                .map { it.location.x }
+                .average(),
+            villagers
+                .map { it.location.y }
+                .average(),
+            villagers
+                .map { it.location.z }
+                .average()
+        )
     }
 
     private fun createStableSettlementId(
