@@ -7,9 +7,7 @@ import io.github.mindzard.mythicinvasion.application.ai.StrategyExecutionState
 import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceStore
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialStore
 import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
-import io.github.mindzard.mythicinvasion.domain.ai.StrategyAction
 import org.bukkit.GameMode
-import org.bukkit.entity.Entity
 import org.bukkit.entity.Player
 import org.bukkit.entity.Zombie
 import org.bukkit.entity.ZombieVillager
@@ -47,29 +45,20 @@ class HostileMobStrategyListener(
         private const val MAX_MEMORY_SCORE =
             100.0
 
+        private const val DAMAGE_MEMORY_GAIN =
+            12.0
+
+        private const val PLAYER_DAMAGE_MEMORY_GAIN =
+            6.0
+
         private const val GROUP_RADIUS =
             12.0
 
         private const val MAX_GROUP_SIZE =
             8
 
-        private const val DAMAGE_MEMORY_GAIN =
-            12.0
-
-        private const val KILL_MEMORY_GAIN =
-            24.0
-
-        private const val PLAYER_DAMAGE_GAIN =
-            6.0
-
-        private const val MIN_PLAYER_SCORE =
-            0.08
-
-        private const val STRATEGIC_ADVANTAGE_MULTIPLIER =
-            0.80
-
-        private const val SUNLIGHT_RETARGET_PENALTY =
-            0.18
+        private const val MIN_TARGET_SCORE =
+            0.10
     }
 
     private data class PlayerMemory(
@@ -78,16 +67,10 @@ class HostileMobStrategyListener(
     )
 
     private val playerMemory =
-        ConcurrentHashMap<
-            UUID,
-            PlayerMemory
-            >()
+        ConcurrentHashMap<UUID, PlayerMemory>()
 
-    private val mobCooldowns =
-        ConcurrentHashMap<
-            UUID,
-            Long
-            >()
+    private val targetCooldowns =
+        ConcurrentHashMap<UUID, Long>()
 
     @EventHandler(
         priority = EventPriority.HIGHEST,
@@ -107,10 +90,6 @@ class HostileMobStrategyListener(
             return
         }
 
-        /*
-         * Vanilla should still control the mob normally when
-         * adaptive behaviour is disabled.
-         */
         if (
             !plugin.config.getBoolean(
                 "adaptive-behaviour.enabled",
@@ -129,36 +108,23 @@ class HostileMobStrategyListener(
             return
         }
 
-        if (
-            shouldAvoidStrategicRetarget(
-                zombie
-            )
-        ) {
-            return
-        }
+        val currentTarget =
+            event.target as? Player
 
         val now =
             System.currentTimeMillis()
 
+        val nextAllowed =
+            targetCooldowns[
+                zombie.uniqueId
+            ]
+
         if (
-            !isCooldownReady(
-                zombie,
-                now
-            )
+            nextAllowed != null &&
+            now < nextAllowed
         ) {
             return
         }
-
-        /*
-         * The event can fire with a non-player target.
-         * In that case we still allow our local intelligence
-         * to search for a valid player.
-         */
-        val currentPlayer =
-            event.target as? Player
-                ?.takeIf {
-                    isValidPlayer(it)
-                }
 
         val candidates =
             zombie.world.players
@@ -174,6 +140,27 @@ class HostileMobStrategyListener(
                         maximumRange *
                         maximumRange
                 }
+                .map { player ->
+
+                    TargetScore(
+                        player =
+                            player,
+                        score =
+                            calculateTargetScore(
+                                zombie =
+                                    zombie,
+                                player =
+                                    player
+                            )
+                    )
+                }
+                .filter {
+                    it.score >=
+                        MIN_TARGET_SCORE
+                }
+                .sortedByDescending {
+                    it.score
+                }
                 .toList()
 
         if (
@@ -183,89 +170,52 @@ class HostileMobStrategyListener(
         }
 
         val best =
-            candidates
-                .map { player ->
-
-                    player to
-                        scorePlayer(
-                            zombie =
-                                zombie,
-                            player =
-                                player,
-                            currentTarget =
-                                currentPlayer
-                        )
-                }
-                .maxByOrNull {
-                    it.second
-                }
-                ?: return
-
-        val bestPlayer =
-            best.first
-
-        val bestScore =
-            best.second
+            candidates.first()
 
         val currentScore =
-            currentPlayer?.let {
-                scorePlayer(
-                    zombie =
-                        zombie,
-                    player =
-                        it,
-                    currentTarget =
-                        it
-                )
+            currentTarget?.let {
+                candidates
+                    .firstOrNull { candidate ->
+                        candidate.player.uniqueId ==
+                            it.uniqueId
+                    }
+                    ?.score
+                    ?: calculateTargetScore(
+                        zombie =
+                            zombie,
+                        player =
+                            it
+                    )
             }
                 ?: 0.0
 
-        if (
-            currentPlayer != null &&
-            bestPlayer.uniqueId ==
-                currentPlayer.uniqueId
-        ) {
-            return
-        }
-
         val requiredAdvantage =
-            if (
-                adaptiveStrategyIsAggressive()
-            ) {
-                max(
-                    0.04,
-                    minimumAdvantage *
-                        STRATEGIC_ADVANTAGE_MULTIPLIER
-                )
-            } else {
+            max(
+                0.03,
                 minimumAdvantage
-            }
+            )
 
-        /*
-         * Never swap targets for a tiny score difference.
-         * This prevents zombie target ping-pong.
-         */
         if (
-            bestScore <
-                MIN_PLAYER_SCORE
+            currentTarget != null &&
+            best.player.uniqueId ==
+                currentTarget.uniqueId
         ) {
             return
         }
 
         if (
-            currentPlayer != null &&
-            bestScore -
+            currentTarget != null &&
+            best.score -
                 currentScore <
                 requiredAdvantage
         ) {
             return
         }
 
-        event.setTarget(
-            bestPlayer
-        )
+        event.target =
+            best.player
 
-        mobCooldowns[
+        targetCooldowns[
             zombie.uniqueId
         ] =
             now +
@@ -277,13 +227,13 @@ class HostileMobStrategyListener(
 
             plugin.logger.info(
                 "Adaptive zombie target: " +
-                    "${currentPlayer?.name ?: "none"}" +
-                    " -> " +
-                    bestPlayer.name +
-                    " | score=" +
+                    "${currentTarget?.name ?: "none"} -> " +
+                    "${best.player.name} " +
+                    "(score=" +
                     "%.2f".format(
-                        bestScore
-                    )
+                        best.score
+                    ) +
+                    ")"
             )
         }
     }
@@ -292,50 +242,7 @@ class HostileMobStrategyListener(
         priority = EventPriority.MONITOR,
         ignoreCancelled = true
     )
-    fun onZombieDamage(
-        event: EntityDamageByEntityEvent
-    ) {
-
-        val player =
-            event.damager as? Player
-                ?: return
-
-        val zombie =
-            event.entity as? Zombie
-                ?: return
-
-        if (
-            zombie is ZombieVillager
-        ) {
-            return
-        }
-
-        if (
-            !isValidPlayer(player)
-        ) {
-            return
-        }
-
-        addMemory(
-            playerId =
-                player.uniqueId,
-            amount =
-                if (
-                    event.damage >= 8.0
-                ) {
-                    DAMAGE_MEMORY_GAIN *
-                        1.5
-                } else {
-                    DAMAGE_MEMORY_GAIN
-                }
-        )
-    }
-
-    @EventHandler(
-        priority = EventPriority.MONITOR,
-        ignoreCancelled = true
-    )
-    fun onPlayerHitByZombie(
+    fun onZombieDamagesPlayer(
         event: EntityDamageByEntityEvent
     ) {
 
@@ -354,7 +261,9 @@ class HostileMobStrategyListener(
                 ?: return
 
         if (
-            !isValidPlayer(player)
+            !isValidPlayer(
+                player
+            )
         ) {
             return
         }
@@ -363,7 +272,55 @@ class HostileMobStrategyListener(
             playerId =
                 player.uniqueId,
             amount =
-                PLAYER_DAMAGE_GAIN
+                PLAYER_DAMAGE_MEMORY_GAIN
+        )
+    }
+
+    @EventHandler(
+        priority = EventPriority.MONITOR,
+        ignoreCancelled = true
+    )
+    fun onPlayerDamagesZombie(
+        event: EntityDamageByEntityEvent
+    ) {
+
+        val player =
+            event.damager as? Player
+                ?: return
+
+        val zombie =
+            event.entity as? Zombie
+                ?: return
+
+        if (
+            zombie is ZombieVillager
+        ) {
+            return
+        }
+
+        if (
+            !isValidPlayer(
+                player
+            )
+        ) {
+            return
+        }
+
+        val bonus =
+            if (
+                event.damage >=
+                    8.0
+            ) {
+                DAMAGE_MEMORY_GAIN * 1.5
+            } else {
+                DAMAGE_MEMORY_GAIN
+            }
+
+        addMemory(
+            playerId =
+                player.uniqueId,
+            amount =
+                bonus
         )
     }
 
@@ -377,84 +334,56 @@ class HostileMobStrategyListener(
         )
     }
 
-    private fun scorePlayer(
+    private fun calculateTargetScore(
         zombie: Zombie,
-        player: Player,
-        currentTarget: Player?
+        player: Player
     ): Double {
 
         val distanceScore =
-            proximityScore(
+            calculateDistanceScore(
                 zombie,
                 player
             )
 
         val memoryScore =
-            memoryScore(
+            calculateMemoryScore(
                 player.uniqueId
             )
 
         val groupScore =
-            groupPressureScore(
+            calculateGroupScore(
                 zombie,
                 player
             )
 
-        val recentTargetBonus =
-            if (
-                currentTarget != null &&
-                currentTarget.uniqueId ==
-                    player.uniqueId
-            ) {
-                0.08
-            } else {
-                0.0
-            }
-
-        val settlementContextScore =
-            settlementContextScore(
+        val settlementScore =
+            calculateSettlementScore(
                 player
             )
 
-        val sunlightPenalty =
+        val daylightAdjustment =
             if (
-                isStrongDaylight(
-                    zombie
-                )
+                zombie.world.isDayTime
             ) {
-                0.0
+                0.90
             } else {
-                SUNLIGHT_RETARGET_PENALTY
-            }
-
-        val strategicPressure =
-            if (
-                adaptiveStrategyIsAggressive()
-            ) {
-                0.10
-            } else {
-                0.0
+                1.0
             }
 
         return (
-            distanceScore * 0.32 +
-                memoryScore * 0.33 +
-                groupScore * 0.18 +
-                settlementContextScore * 0.09 +
-                recentTargetBonus +
-                strategicPressure
-            )
-            .minus(
-                sunlightPenalty *
-                    0.05
-            )
+            distanceScore * 0.40 +
+                memoryScore * 0.30 +
+                groupScore * 0.20 +
+                settlementScore * 0.10
+            ) *
+            daylightAdjustment
             .coerceIn(
                 0.0,
                 1.0
             )
     }
 
-    private fun proximityScore(
+    private fun calculateDistanceScore(
         zombie: Zombie,
         player: Player
     ): Double {
@@ -463,12 +392,6 @@ class HostileMobStrategyListener(
             maximumRange *
                 maximumRange
 
-        val distanceSquared =
-            distanceSquared(
-                zombie,
-                player
-            )
-
         if (
             maxDistanceSquared <=
                 0.0
@@ -476,12 +399,16 @@ class HostileMobStrategyListener(
             return 0.0
         }
 
+        val distanceSquared =
+            distanceSquared(
+                zombie,
+                player
+            )
+
         return (
             1.0 -
-                (
-                    distanceSquared /
-                        maxDistanceSquared
-                    )
+                distanceSquared /
+                    maxDistanceSquared
             )
             .coerceIn(
                 0.0,
@@ -489,7 +416,7 @@ class HostileMobStrategyListener(
             )
     }
 
-    private fun memoryScore(
+    private fun calculateMemoryScore(
         playerId: UUID
     ): Double {
 
@@ -513,12 +440,12 @@ class HostileMobStrategyListener(
             )
     }
 
-    private fun groupPressureScore(
+    private fun calculateGroupScore(
         zombie: Zombie,
         player: Player
     ): Double {
 
-        val zombies =
+        val nearbyZombies =
             zombie.world
                 .getNearbyEntities(
                     zombie.location,
@@ -535,39 +462,40 @@ class HostileMobStrategyListener(
                 )
 
         if (
-            zombies.isEmpty()
+            nearbyZombies.isEmpty()
         ) {
             return 0.0
         }
 
-        var pressure =
+        var sameTargetCount =
             0
 
         for (
-            other in zombies
+            nearbyZombie in
+            nearbyZombies
         ) {
 
             if (
-                other.uniqueId ==
+                nearbyZombie.uniqueId ==
                     zombie.uniqueId
             ) {
                 continue
             }
 
             val target =
-                other.target as? Player
+                nearbyZombie.target as? Player
                     ?: continue
 
             if (
                 target.uniqueId ==
                     player.uniqueId
             ) {
-                pressure++
+                sameTargetCount++
             }
         }
 
         return (
-            pressure.toDouble() /
+            sameTargetCount.toDouble() /
                 MAX_GROUP_SIZE.toDouble()
             )
             .coerceIn(
@@ -576,122 +504,58 @@ class HostileMobStrategyListener(
             )
     }
 
-    private fun settlementContextScore(
+    private fun calculateSettlementScore(
         player: Player
     ): Double {
 
-        /*
-         * This layer intentionally stays lightweight.
-         * Settlement intelligence already exists elsewhere;
-         * here we only reward players who are actively near a
-         * known settlement area without forcing new dependencies.
-         */
-        val settlement =
+        val settlements =
             societyStateStore
                 .current()
                 .settlements
                 .values
-                .asSequence()
-                .filter {
-                    it.worldName ==
-                        player.world.name
-                }
-                .map { settlement ->
 
-                    val dx =
-                        player.location.x -
-                            settlement.centerX
-
-                    val dy =
-                        player.location.y -
-                            settlement.centerY
-
-                    val dz =
-                        player.location.z -
-                            settlement.centerZ
-
-                    val distanceSquared =
-                        dx * dx +
-                            dy * dy +
-                            dz * dz
-
-                    settlement to
-                        distanceSquared
-                }
-                .filter { (settlement, distanceSquared) ->
-
-                    val radius =
-                        settlement.radius
-                            .toDouble()
-
-                    distanceSquared <=
-                        radius *
-                        radius
-                }
-                .minByOrNull {
-                    it.second
-                }
-                ?.first
-                ?: return 0.0
-
-        /*
-         * A player near a settlement is slightly more important
-         * during a strategic hostile-pressure state.
-         */
-        return if (
-            settlement.population >
-                0
+        for (
+            settlement in
+            settlements
         ) {
-            1.0
-        } else {
-            0.0
-        }
-    }
 
-    private fun adaptiveStrategyIsAggressive(): Boolean {
+            if (
+                settlement.worldName !=
+                    player.world.name
+            ) {
+                continue
+            }
 
-        val decision =
-            strategyExecutionState
-                .current()
-                ?: return false
+            val dx =
+                player.location.x -
+                    settlement.centerX
 
-        val minimumConfidence =
-            plugin.config
-                .getDouble(
-                    "ai.minimum-confidence",
-                    0.65
-                )
-                .coerceIn(
-                    0.0,
-                    1.0
-                )
+            val dy =
+                player.location.y -
+                    settlement.centerY
 
-        if (
-            decision.confidence <
-                minimumConfidence
-        ) {
-            return false
+            val dz =
+                player.location.z -
+                    settlement.centerZ
+
+            val distanceSquared =
+                dx * dx +
+                    dy * dy +
+                    dz * dz
+
+            val radius =
+                settlement.radius
+                    .toDouble()
+
+            if (
+                distanceSquared <=
+                    radius * radius
+            ) {
+                return 1.0
+            }
         }
 
-        return decision
-            .suggestedActions
-            .asSequence()
-            .map {
-                actionParser.parse(
-                    it
-                )
-            }
-            .any {
-                it ==
-                    StrategyAction
-                        .INCREASE_HOSTILE_PRESSURE ||
-                    it ==
-                    StrategyAction
-                        .FOCUS_HIGH_PRESSURE_PLAYERS ||
-                    it ==
-                    StrategyAction
-                        .ADAPTIVE_HOSTILE_TARGETING
-            }
+        return 0.0
     }
 
     private fun addMemory(
@@ -702,39 +566,38 @@ class HostileMobStrategyListener(
         val now =
             System.currentTimeMillis()
 
-        val memory =
-            playerMemory.compute(
-                playerId
-            ) { _, existing ->
+        playerMemory.compute(
+            playerId
+        ) { _, existing ->
 
-                val current =
-                    existing
-                        ?: PlayerMemory(
-                            score =
-                                0.0,
-                            lastUpdatedMillis =
-                                now
-                        )
+            val memory =
+                existing
+                    ?: PlayerMemory(
+                        score =
+                            0.0,
+                        lastUpdatedMillis =
+                            now
+                    )
 
-                decayMemory(
-                    current,
-                    now
-                )
+            decayMemory(
+                memory,
+                now
+            )
 
-                current.score =
-                    (
-                        current.score +
-                            amount
-                        )
-                        .coerceAtMost(
-                            MAX_MEMORY_SCORE
-                        )
+            memory.score =
+                (
+                    memory.score +
+                        amount
+                    )
+                    .coerceAtMost(
+                        MAX_MEMORY_SCORE
+                    )
 
-                current.lastUpdatedMillis =
-                    now
+            memory.lastUpdatedMillis =
+                now
 
-                current
-            }
+            memory
+        }
     }
 
     private fun decayMemory(
@@ -748,7 +611,8 @@ class HostileMobStrategyListener(
                 memory.lastUpdatedMillis
 
         if (
-            elapsed <= 0L
+            elapsed <=
+                0L
         ) {
             return
         }
@@ -771,44 +635,6 @@ class HostileMobStrategyListener(
             now
     }
 
-    private fun isCooldownReady(
-        zombie: Zombie,
-        now: Long
-    ): Boolean {
-
-        val nextAllowed =
-            mobCooldowns[
-                zombie.uniqueId
-            ]
-                ?: return true
-
-        return now >=
-            nextAllowed
-    }
-
-    private fun shouldAvoidStrategicRetarget(
-        zombie: Zombie
-    ): Boolean {
-
-        /*
-         * When exposed to strong daylight, keep vanilla pursuit
-         * behavior stable rather than constantly calculating
-         * ambitious target changes.
-         */
-        return isStrongDaylight(
-            zombie
-        ) &&
-            zombie.isInDaylight
-    }
-
-    private fun isStrongDaylight(
-        zombie: Zombie
-    ): Boolean {
-
-        return zombie.world.isDayTime &&
-            zombie.location.block.lightFromSky >= 12
-    }
-
     private fun isValidPlayer(
         player: Player
     ): Boolean {
@@ -820,27 +646,27 @@ class HostileMobStrategyListener(
     }
 
     private fun distanceSquared(
-        entity: Entity,
+        zombie: Zombie,
         player: Player
     ): Double {
 
         if (
-            entity.world.uid !=
+            zombie.world.uid !=
                 player.world.uid
         ) {
             return Double.MAX_VALUE
         }
 
         val dx =
-            entity.location.x -
+            zombie.location.x -
                 player.location.x
 
         val dy =
-            entity.location.y -
+            zombie.location.y -
                 player.location.y
 
         val dz =
-            entity.location.z -
+            zombie.location.z -
                 player.location.z
 
         return (
@@ -857,4 +683,9 @@ class HostileMobStrategyListener(
             false
         )
     }
+
+    private data class TargetScore(
+        val player: Player,
+        val score: Double
+    )
 }
