@@ -1,6 +1,6 @@
 name: MythicInvasion
 
-version: '${version}'
+version: 0.1.0-SNAPSHOT
 
 main: io.github.mindzard.mythicinvasion.MythicInvasionPlugin
 
@@ -11,3 +11,14 @@ author: MindZard
 api-version: '1.21'
 
 folia-supported: false
+
+commands:
+  society:
+    description: Shows the current MythicInvasion society state.
+    usage: /society
+    permission: mythicinvasion.debug.society
+
+permissions:
+  mythicinvasion.debug.society:
+    description: Allows access to MythicInvasion society debug information.
+    default: op
