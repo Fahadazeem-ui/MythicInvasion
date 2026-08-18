@@ -1,6 +1,7 @@
 package io.github.mindzard.mythicinvasion.bootstrap
 
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourEventBuffer
+import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourFeatureEngine
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourProcessor
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourProfileStore
 import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemCoordinator
@@ -30,6 +31,9 @@ class ServiceRegistry {
         private set
 
     lateinit var behaviourProfileStore: BehaviourProfileStore
+        private set
+
+    lateinit var behaviourFeatureEngine: BehaviourFeatureEngine
         private set
 
     lateinit var behaviourProcessor: BehaviourProcessor
@@ -75,6 +79,12 @@ class ServiceRegistry {
         store: BehaviourProfileStore
     ) {
         behaviourProfileStore = store
+    }
+
+    fun registerBehaviourFeatureEngine(
+        engine: BehaviourFeatureEngine
+    ) {
+        behaviourFeatureEngine = engine
     }
 
     fun registerBehaviourProcessor(
