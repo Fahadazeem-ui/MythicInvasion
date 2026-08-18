@@ -2,6 +2,7 @@ package io.github.mindzard.mythicinvasion.bootstrap
 
 import io.github.mindzard.mythicinvasion.MythicInvasionPlugin
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourEventBuffer
+import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourFeatureEngine
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourProcessor
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourProfileStore
 import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemCoordinator
@@ -84,12 +85,20 @@ class PluginBootstrap(
             behaviourProfileStore
         )
 
+        val behaviourFeatureEngine =
+            BehaviourFeatureEngine()
+
+        registry.registerBehaviourFeatureEngine(
+            behaviourFeatureEngine
+        )
+
         val behaviourProcessor =
             BehaviourProcessor(
                 plugin = plugin,
                 coroutineEngine = coroutineEngine,
                 buffer = behaviourEventBuffer,
-                profileStore = behaviourProfileStore
+                profileStore = behaviourProfileStore,
+                featureEngine = behaviourFeatureEngine
             )
 
         registry.registerBehaviourProcessor(
@@ -97,7 +106,7 @@ class PluginBootstrap(
         )
 
         /*
-         * Register Minecraft event listeners.
+         * Register Bukkit/Paper event listeners.
          */
         plugin.server.pluginManager.registerEvents(
             PlayerBehaviourListener(
@@ -134,6 +143,10 @@ class PluginBootstrap(
 
         plugin.logger.info(
             "Behaviour profile store initialized."
+        )
+
+        plugin.logger.info(
+            "Behaviour feature engine initialized."
         )
 
         plugin.logger.info(
