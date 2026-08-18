@@ -19,13 +19,14 @@ import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntel
 import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceStore
 import io.github.mindzard.mythicinvasion.application.society.FactionRelationService
 import io.github.mindzard.mythicinvasion.application.society.PillagerFactionCoordinator
+import io.github.mindzard.mythicinvasion.application.society.PillagerSettlementTargetingEngine
+import io.github.mindzard.mythicinvasion.application.society.PillagerStrategyStore
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationCoordinator
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationEngine
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialCoordinator
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialEngine
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialStore
 import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
-import io.github.mindzard.mythicinvasion.application.society.VillagerCitizenCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipEngine
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipStore
@@ -175,7 +176,9 @@ class PluginBootstrap(
         )
 
         val worldSnapshotCollector =
-            WorldSnapshotCollector(plugin)
+            WorldSnapshotCollector(
+                plugin
+            )
 
         registry.registerWorldSnapshotCollector(
             worldSnapshotCollector
@@ -218,7 +221,9 @@ class PluginBootstrap(
         )
 
         val settlementObservationCollector =
-            SettlementObservationCollector(plugin)
+            SettlementObservationCollector(
+                plugin
+            )
 
         registry.registerSettlementObservationCollector(
             settlementObservationCollector
@@ -268,7 +273,9 @@ class PluginBootstrap(
         )
 
         val villagerObservationCollector =
-            VillagerObservationCollector(plugin)
+            VillagerObservationCollector(
+                plugin
+            )
 
         registry.registerVillagerObservationCollector(
             villagerObservationCollector
@@ -354,62 +361,6 @@ class PluginBootstrap(
 
         registry.registerVillagerRelationshipCoordinator(
             villagerRelationshipCoordinator
-        )
-
-        val villagerCitizenCoordinator =
-            VillagerCitizenCoordinator(
-                plugin =
-                    plugin,
-                coroutineEngine =
-                    coroutineEngine,
-                stateStore =
-                    societyStateStore,
-                relationshipStore =
-                    villagerRelationshipStore,
-                updateIntervalMillis = {
-                    configurationManager
-                        .villagerCitizenUpdateIntervalMillis()
-                },
-                interactionRadius =
-                    configurationManager
-                        .villagerCitizenInteractionRadius(),
-                hostileRadius =
-                    configurationManager
-                        .villagerCitizenHostileRadius(),
-                friendlyLookRadius =
-                    configurationManager
-                        .villagerCitizenFriendlyLookRadius(),
-                hostileThreatThreshold =
-                    configurationManager
-                        .villagerCitizenHostileThreatThreshold(),
-                friendlyTrustThreshold =
-                    configurationManager
-                        .villagerCitizenFriendlyTrustThreshold(),
-                actionCooldownMillis =
-                    configurationManager
-                        .villagerCitizenActionCooldownMillis()
-            )
-
-        registry.registerVillagerCitizenCoordinator(
-            villagerCitizenCoordinator
-        )
-
-        val pillagerFactionCoordinator =
-            PillagerFactionCoordinator(
-                plugin =
-                    plugin,
-                coroutineEngine =
-                    coroutineEngine,
-                stateStore =
-                    societyStateStore,
-                updateIntervalMillis = {
-                    configurationManager
-                        .pillagerFactionUpdateIntervalMillis()
-                }
-            )
-
-        registry.registerPillagerFactionCoordinator(
-            pillagerFactionCoordinator
         )
 
         val settlementSocialEngine =
@@ -544,16 +495,11 @@ class PluginBootstrap(
             )
 
             aiStrategyCoordinator.start()
-
-            plugin.logger.info(
-                "Gemini AI strategy subsystem initialized."
-            )
         }
 
         if (
             configurationManager
-                .isAdaptiveBehaviourEnabled()
-            &&
+                .isAdaptiveBehaviourEnabled() &&
             configurationManager
                 .isAdaptiveHostileTargetingEnabled()
         ) {
@@ -593,6 +539,53 @@ class PluginBootstrap(
             )
         }
 
+        /*
+         * =========================================================
+         * PILLAGER FACTION STRATEGY
+         * =========================================================
+         */
+
+        val pillagerStrategyStore =
+            PillagerStrategyStore()
+
+        registry.registerPillagerStrategyStore(
+            pillagerStrategyStore
+        )
+
+        val pillagerTargetingEngine =
+            PillagerSettlementTargetingEngine()
+
+        registry.registerPillagerTargetingEngine(
+            pillagerTargetingEngine
+        )
+
+        val pillagerFactionCoordinator =
+            PillagerFactionCoordinator(
+                plugin =
+                    plugin,
+                coroutineEngine =
+                    coroutineEngine,
+                stateStore =
+                    societyStateStore,
+                socialStore =
+                    settlementSocialStore,
+                strategyStore =
+                    pillagerStrategyStore,
+                targetingEngine =
+                    pillagerTargetingEngine,
+                updateIntervalMillis = {
+                    configurationManager
+                        .pillagerFactionStrategyIntervalMillis()
+                },
+                assignmentRadius =
+                    configurationManager
+                        .pillagerAssignmentRadius()
+            )
+
+        registry.registerPillagerFactionCoordinator(
+            pillagerFactionCoordinator
+        )
+
         plugin.server.pluginManager.registerEvents(
             PlayerBehaviourListener(
                 buffer =
@@ -608,7 +601,9 @@ class PluginBootstrap(
                 societyStateStore =
                     societyStateStore,
                 socialStore =
-                    settlementSocialStore
+                    settlementSocialStore,
+                pillagerStrategyStore =
+                    pillagerStrategyStore
             )
         )
 
@@ -645,22 +640,16 @@ class PluginBootstrap(
             villagerRelationshipCoordinator.start()
 
             settlementSocialCoordinator.start()
+        }
 
-            if (
-                configurationManager
-                    .isVillagerCitizenBehaviourEnabled()
-            ) {
+        if (
+            configurationManager
+                .isSocietyEnabled() &&
+            configurationManager
+                .isPillagerFactionStrategyEnabled()
+        ) {
 
-                villagerCitizenCoordinator.start()
-            }
-
-            if (
-                configurationManager
-                    .isPillagerFactionIntelligenceEnabled()
-            ) {
-
-                pillagerFactionCoordinator.start()
-            }
+            pillagerFactionCoordinator.start()
         }
 
         plugin.logger.info(
