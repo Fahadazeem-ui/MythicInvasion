@@ -29,6 +29,7 @@ import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshi
 import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyEngine
 import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyStore
+import io.github.mindzard.mythicinvasion.application.society.VillagerCitizenCoordinator
 import io.github.mindzard.mythicinvasion.application.world.WorldIntelligenceCoordinator
 import io.github.mindzard.mythicinvasion.application.world.WorldIntelligenceEngine
 import io.github.mindzard.mythicinvasion.application.world.WorldStateStore
@@ -122,6 +123,9 @@ class ServiceRegistry {
         private set
 
     lateinit var villagerRelationshipCoordinator: VillagerRelationshipCoordinator
+        private set
+
+    lateinit var villagerCitizenCoordinator: VillagerCitizenCoordinator
         private set
 
     lateinit var settlementSocialEngine: SettlementSocialEngine
@@ -323,6 +327,12 @@ class ServiceRegistry {
         coordinator: VillagerRelationshipCoordinator
     ) {
         villagerRelationshipCoordinator = coordinator
+    }
+
+    fun registerVillagerCitizenCoordinator(
+        coordinator: VillagerCitizenCoordinator
+    ) {
+        villagerCitizenCoordinator = coordinator
     }
 
     fun registerSettlementSocialEngine(
