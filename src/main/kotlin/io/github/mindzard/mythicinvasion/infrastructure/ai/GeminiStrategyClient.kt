@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit
 
 class GeminiStrategyClient(
     private val plugin: JavaPlugin,
+    private val apiKey: String?,
     private val model: String,
     private val timeoutMillis: Long
 ) {
@@ -28,13 +29,15 @@ class GeminiStrategyClient(
         }
 
     private val client: Client? =
-        System.getenv("GOOGLE_API_KEY")
+        apiKey
             ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { apiKey ->
+            ?.takeIf {
+                it.isNotEmpty()
+            }
+            ?.let { key ->
                 Client
                     .builder()
-                    .apiKey(apiKey)
+                    .apiKey(key)
                     .build()
             }
 
@@ -57,10 +60,6 @@ class GeminiStrategyClient(
 
         return try {
 
-            /*
-             * The Google Gen AI Java SDK exposes async model generation
-             * through client.async.models.generateContent(...).
-             */
             val future =
                 activeClient
                     .async
@@ -110,23 +109,19 @@ class GeminiStrategyClient(
 
             You do NOT directly control Minecraft entities.
 
-            You must return exactly one high-level strategic decision.
+            Return exactly one high-level strategic decision.
 
-            Your decision must:
-
-            - be conservative and believable;
-            - never invent unavailable world facts;
-            - never request impossible Minecraft actions;
-            - never directly control individual entities;
-            - prefer strategies executable by a deterministic
-              local game engine;
+            The decision must:
+            - be believable;
+            - use only supplied world information;
+            - avoid impossible actions;
             - preserve player agency;
             - avoid repetitive escalation;
             - consider settlement safety;
-            - consider player relationships;
-            - consider current world state.
+            - consider social relationships;
+            - be executable later by a deterministic local engine.
 
-            Return ONLY valid JSON with this exact structure:
+            Return ONLY valid JSON:
 
             {
               "strategyId": "string",
@@ -134,9 +129,7 @@ class GeminiStrategyClient(
               "summary": "string",
               "reasoning": "string",
               "confidence": 0.0,
-              "suggestedActions": [
-                "string"
-              ]
+              "suggestedActions": ["string"]
             }
 
             World context:
@@ -149,79 +142,66 @@ class GeminiStrategyClient(
         rawText: String?
     ): AiDecision? {
 
-        if (rawText.isNullOrBlank()) {
+        if (
+            rawText.isNullOrBlank()
+        ) {
             return null
         }
 
         return try {
 
-            /*
-             * Gemini is instructed to return JSON, but models can
-             * occasionally wrap JSON in markdown fences.
-             *
-             * Clean those fences before parsing.
-             */
             val cleaned =
                 cleanJsonResponse(
                     rawText
                 )
 
-            val rootElement =
-                json.parseToJsonElement(
-                    cleaned
-                )
-
-            val rootObject: JsonObject =
-                rootElement.jsonObject
+            val root =
+                json
+                    .parseToJsonElement(
+                        cleaned
+                    )
+                    .jsonObject
 
             val strategyId =
-                rootObject
-                    .stringValue(
-                        "strategyId"
-                    )
+                root.stringValue(
+                    "strategyId"
+                )
                     ?: return null
 
             val priority =
-                rootObject
-                    .intValue(
-                        "priority"
-                    )
+                root.intValue(
+                    "priority"
+                )
                     ?: return null
 
             val summary =
-                rootObject
-                    .stringValue(
-                        "summary"
-                    )
+                root.stringValue(
+                    "summary"
+                )
                     ?: return null
 
             val reasoning =
-                rootObject
-                    .stringValue(
-                        "reasoning"
-                    )
+                root.stringValue(
+                    "reasoning"
+                )
                     ?: return null
 
             val confidence =
-                rootObject
-                    .doubleValue(
-                        "confidence"
-                    )
+                root.doubleValue(
+                    "confidence"
+                )
                     ?: return null
 
             val suggestedActions =
-                rootObject
-                    .arrayOfStrings(
-                        "suggestedActions"
-                    )
-                    .take(
-                        10
-                    )
+                root.arrayOfStrings(
+                    "suggestedActions"
+                )
+                    .take(10)
                     .map {
                         it.take(250)
                     }
 
-            return AiDecision(
+            AiDecision(
                 strategyId =
                     strategyId
                         .trim()
@@ -258,14 +238,12 @@ class GeminiStrategyClient(
                     System.currentTimeMillis()
             )
 
-        } catch (exception: Exception) {
+        } catch (
+            exception: Exception
+        ) {
 
             plugin.logger.warning(
-                "Gemini returned an invalid strategic JSON response."
-            )
-
-            plugin.logger.fine(
-                "Gemini raw response: $rawText"
+                "Gemini returned invalid JSON."
             )
 
             null
@@ -324,11 +302,11 @@ class GeminiStrategyClient(
             this[key]
                 ?: return null
 
-        val primitive: JsonPrimitive =
+        val primitive:
+            JsonPrimitive =
             element.jsonPrimitive
 
-        return primitive
-            .content
+        return primitive.content
             .trim()
             .ifBlank {
                 null
@@ -339,26 +317,18 @@ class GeminiStrategyClient(
         key: String
     ): Int? {
 
-        val element =
-            this[key]
-                ?: return null
-
-        return element
-            .jsonPrimitive
-            .intOrNull
+        return this[key]
+            ?.jsonPrimitive
+            ?.intOrNull
     }
 
     private fun JsonObject.doubleValue(
         key: String
     ): Double? {
 
-        val element =
-            this[key]
-                ?: return null
-
-        return element
-            .jsonPrimitive
-            .doubleOrNull
+        return this[key]
+            ?.jsonPrimitive
+            ?.doubleOrNull
     }
 
     private fun JsonObject.arrayOfStrings(
@@ -369,22 +339,20 @@ class GeminiStrategyClient(
             this[key]
                 ?: return emptyList()
 
-        val array: JsonArray =
+        val array:
+            JsonArray =
             element.jsonArray
 
-        return array
-            .mapNotNull { element ->
+        return array.mapNotNull { item ->
 
-                val primitive =
-                    element
-                        .jsonPrimitive
+            val primitive =
+                item.jsonPrimitive
 
-                primitive
-                    .content
-                    .trim()
-                    .ifBlank {
-                        null
-                    }
-            }
+            primitive.content
+                .trim()
+                .ifBlank {
+                    null
+                }
+        }
     }
 }
