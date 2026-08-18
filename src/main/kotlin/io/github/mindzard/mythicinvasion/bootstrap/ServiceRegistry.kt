@@ -12,6 +12,8 @@ import io.github.mindzard.mythicinvasion.application.society.FactionRelationServ
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationCoordinator
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationEngine
 import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
+import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipCoordinator
+import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipStore
 import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyEngine
 import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyStore
@@ -23,6 +25,7 @@ import io.github.mindzard.mythicinvasion.config.ConfigurationManager
 import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.PlayerSnapshotCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.society.SettlementObservationCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.society.VillagerObservationCollector
+import io.github.mindzard.mythicinvasion.infrastructure.paper.society.VillagerRelationshipCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.world.WorldSnapshotCollector
 
 class ServiceRegistry {
@@ -97,6 +100,15 @@ class ServiceRegistry {
         private set
 
     lateinit var villagerSocietyCoordinator: VillagerSocietyCoordinator
+        private set
+
+    lateinit var villagerRelationshipCollector: VillagerRelationshipCollector
+        private set
+
+    lateinit var villagerRelationshipStore: VillagerRelationshipStore
+        private set
+
+    lateinit var villagerRelationshipCoordinator: VillagerRelationshipCoordinator
         private set
 
     fun registerConfigurationManager(
@@ -241,5 +253,23 @@ class ServiceRegistry {
         coordinator: VillagerSocietyCoordinator
     ) {
         villagerSocietyCoordinator = coordinator
+    }
+
+    fun registerVillagerRelationshipCollector(
+        collector: VillagerRelationshipCollector
+    ) {
+        villagerRelationshipCollector = collector
+    }
+
+    fun registerVillagerRelationshipStore(
+        store: VillagerRelationshipStore
+    ) {
+        villagerRelationshipStore = store
+    }
+
+    fun registerVillagerRelationshipCoordinator(
+        coordinator: VillagerRelationshipCoordinator
+    ) {
+        villagerRelationshipCoordinator = coordinator
     }
 }
