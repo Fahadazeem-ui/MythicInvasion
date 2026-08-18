@@ -75,9 +75,9 @@ class MythicInvasionPlugin : JavaPlugin() {
                         .stop()
                 }
 
-                services.villagerCitizenCoordinator.stop()
-
-                services.pillagerFactionCoordinator.stop()
+                services
+                    .pillagerFactionCoordinator
+                    .stop()
 
                 services.behaviourProcessor.stop()
 
@@ -96,6 +96,8 @@ class MythicInvasionPlugin : JavaPlugin() {
                 services.strategyCooldownStore.clear()
 
                 services.strategyExecutionState.clear()
+
+                services.pillagerStrategyStore.clear()
 
                 services.coroutineEngine.shutdown()
 
