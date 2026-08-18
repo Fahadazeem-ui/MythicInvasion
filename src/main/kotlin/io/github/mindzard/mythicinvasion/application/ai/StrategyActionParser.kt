@@ -29,6 +29,9 @@ class StrategyActionParser {
             "FOCUS_HIGH_PRESSURE_PLAYERS" ->
                 StrategyAction.FOCUS_HIGH_PRESSURE_PLAYERS
 
+            "ADAPTIVE_HOSTILE_TARGETING" ->
+                StrategyAction.ADAPTIVE_HOSTILE_TARGETING
+
             "DEFEND_SETTLEMENTS" ->
                 StrategyAction.DEFEND_SETTLEMENTS
 
