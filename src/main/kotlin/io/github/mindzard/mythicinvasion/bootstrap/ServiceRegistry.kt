@@ -15,12 +15,14 @@ import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemEngine
 import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceEngine
 import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceStore
 import io.github.mindzard.mythicinvasion.application.society.FactionRelationService
+import io.github.mindzard.mythicinvasion.application.society.PillagerFactionCoordinator
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationCoordinator
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationEngine
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialCoordinator
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialEngine
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialStore
 import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
+import io.github.mindzard.mythicinvasion.application.society.VillagerCitizenCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipStore
 import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyCoordinator
@@ -119,6 +121,12 @@ class ServiceRegistry {
         private set
 
     lateinit var villagerRelationshipCoordinator: VillagerRelationshipCoordinator
+        private set
+
+    lateinit var villagerCitizenCoordinator: VillagerCitizenCoordinator
+        private set
+
+    lateinit var pillagerFactionCoordinator: PillagerFactionCoordinator
         private set
 
     lateinit var settlementSocialEngine: SettlementSocialEngine
@@ -311,6 +319,18 @@ class ServiceRegistry {
         coordinator: VillagerRelationshipCoordinator
     ) {
         villagerRelationshipCoordinator = coordinator
+    }
+
+    fun registerVillagerCitizenCoordinator(
+        coordinator: VillagerCitizenCoordinator
+    ) {
+        villagerCitizenCoordinator = coordinator
+    }
+
+    fun registerPillagerFactionCoordinator(
+        coordinator: PillagerFactionCoordinator
+    ) {
+        pillagerFactionCoordinator = coordinator
     }
 
     fun registerSettlementSocialEngine(
