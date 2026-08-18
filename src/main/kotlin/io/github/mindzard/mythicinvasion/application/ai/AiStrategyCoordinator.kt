@@ -7,8 +7,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import org.bukkit.plugin.java.JavaPlugin
 
 class AiStrategyCoordinator(
@@ -16,14 +14,10 @@ class AiStrategyCoordinator(
     private val coroutineEngine: CoroutineEngine,
     private val contextAssembler: AiContextAssembler,
     private val geminiClient: GeminiStrategyClient,
+    private val validator: AiDecisionValidator,
     private val updateIntervalMillis: () -> Long,
     private val maxContextCharacters: Int
 ) {
-
-    private val json =
-        Json {
-            encodeDefaults = true
-        }
 
     private var job: Job? = null
 
@@ -32,7 +26,9 @@ class AiStrategyCoordinator(
 
     fun start() {
 
-        if (job != null) {
+        if (
+            job != null
+        ) {
             return
         }
 
@@ -40,9 +36,9 @@ class AiStrategyCoordinator(
             !geminiClient.isConfigured()
         ) {
 
-            plugin.logger.info(
-                "AI strategy layer is disabled because " +
-                    "GOOGLE_API_KEY is not configured."
+            plugin.logger.warning(
+                "AI strategy layer is enabled, " +
+                    "but GOOGLE_API_KEY is not configured."
             )
 
             return
@@ -50,6 +46,10 @@ class AiStrategyCoordinator(
 
         job =
             coroutineEngine.scope.launch {
+
+                plugin.logger.info(
+                    "Gemini AI strategy coordinator started."
+                )
 
                 while (isActive) {
 
@@ -60,12 +60,12 @@ class AiStrategyCoordinator(
                                 .assemble()
 
                         val contextJson =
-                            json
-                                .encodeToString(
-                                    context
-                                )
-                                .take(
-                                    maxContextCharacters
+                            contextAssembler
+                                .toJson(
+                                    context =
+                                        context,
+                                    maximumCharacters =
+                                        maxContextCharacters
                                 )
 
                         val decision =
@@ -78,18 +78,36 @@ class AiStrategyCoordinator(
                             decision != null
                         ) {
 
-                            latestDecision =
-                                decision
+                            val validated =
+                                validator.validate(
+                                    decision
+                                )
 
-                            plugin.logger.info(
-                                "AI strategy updated: " +
-                                    decision.strategyId +
-                                    " (confidence=" +
-                                    "%.2f".format(
-                                        decision.confidence
-                                    ) +
-                                    ")"
-                            )
+                            if (
+                                validated != null
+                            ) {
+
+                                latestDecision =
+                                    validated
+
+                                plugin.logger.info(
+                                    "AI strategy accepted: " +
+                                        validated.strategyId +
+                                        " | priority=" +
+                                        validated.priority +
+                                        " | confidence=" +
+                                        "%.2f".format(
+                                            validated.confidence
+                                        )
+                                )
+
+                            } else {
+
+                                plugin.logger.warning(
+                                    "AI strategy was rejected " +
+                                        "by the local validator."
+                                )
+                            }
                         }
 
                     } catch (
@@ -98,7 +116,8 @@ class AiStrategyCoordinator(
 
                         plugin.logger.warning(
                             "AI strategy cycle failed: " +
-                                exception.message
+                                "${exception.javaClass.simpleName}: " +
+                                "${exception.message}"
                         )
                     }
 
@@ -114,8 +133,13 @@ class AiStrategyCoordinator(
     }
 
     fun stop() {
+
         job?.cancel()
         job = null
         latestDecision = null
+
+        plugin.logger.info(
+            "Gemini AI strategy coordinator stopped."
+        )
     }
 }
