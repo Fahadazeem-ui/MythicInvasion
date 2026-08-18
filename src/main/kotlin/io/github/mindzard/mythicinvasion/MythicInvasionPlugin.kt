@@ -24,11 +24,10 @@ class MythicInvasionPlugin : JavaPlugin() {
 
         try {
 
-            val bootstrap =
-                PluginBootstrap(this)
-
             services =
-                bootstrap.start()
+                PluginBootstrap(
+                    this
+                ).start()
 
             logger.info(
                 "MythicInvasion started successfully."
@@ -58,11 +57,15 @@ class MythicInvasionPlugin : JavaPlugin() {
             "Shutting down MythicInvasion..."
         )
 
-        if (::services.isInitialized) {
+        if (
+            ::services.isInitialized
+        ) {
 
             try {
 
                 services.behaviourProcessor.stop()
+
+                services.settlementSocialCoordinator.stop()
 
                 services.villagerRelationshipCoordinator.stop()
 
@@ -85,6 +88,8 @@ class MythicInvasionPlugin : JavaPlugin() {
                 services.villagerRelationshipStore.clear()
 
                 services.villagerSocietyStore.clear()
+
+                services.settlementSocialStore.clear()
 
                 services.societyStateStore.reset()
 
