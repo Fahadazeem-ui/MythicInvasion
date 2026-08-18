@@ -1,104 +1,79 @@
 package io.github.mindzard.mythicinvasion.infrastructure.paper.ai
 
+import io.github.mindzard.mythicinvasion.application.ai.AdaptiveTargetingEngine
 import io.github.mindzard.mythicinvasion.application.ai.StrategyActionParser
 import io.github.mindzard.mythicinvasion.application.ai.StrategyCooldownStore
 import io.github.mindzard.mythicinvasion.application.ai.StrategyExecutionState
+import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceStore
+import io.github.mindzard.mythicinvasion.application.society.SettlementSocialStore
+import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
 import io.github.mindzard.mythicinvasion.domain.ai.StrategyAction
-import org.bukkit.entity.Monster
+import org.bukkit.GameMode
+import org.bukkit.entity.Pillager
 import org.bukkit.entity.Player
+import org.bukkit.entity.Zombie
+import org.bukkit.entity.ZombieVillager
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
+import org.bukkit.plugin.java.JavaPlugin
+import kotlin.math.max
 
 class HostileMobStrategyListener(
-    private val executionState: StrategyExecutionState,
+    private val plugin: JavaPlugin,
+    private val intelligenceStore: BehaviourIntelligenceStore,
+    private val societyStateStore: SocietyStateStore,
+    private val settlementSocialStore: SettlementSocialStore,
+    private val strategyExecutionState: StrategyExecutionState,
     private val actionParser: StrategyActionParser,
-    private val cooldownStore: StrategyCooldownStore
+    private val cooldownStore: StrategyCooldownStore,
+    private val adaptiveTargetingEngine: AdaptiveTargetingEngine,
+    private val maximumRange: Double,
+    private val minimumAdvantage: Double,
+    private val cooldownMillis: Long
 ) : Listener {
 
-    companion object {
-
-        private const val TARGET_SELECTION_COOLDOWN =
-            5_000L
-
-        private const val MAX_TARGET_DISTANCE_SQUARED =
-            48.0 * 48.0
-    }
-
     @EventHandler(
-        priority = EventPriority.MONITOR,
+        priority = EventPriority.HIGHEST,
         ignoreCancelled = true
     )
     fun onMobTarget(
         event: EntityTargetLivingEntityEvent
     ) {
 
-        val monster =
-            event.entity as? Monster
-                ?: return
+        val mob =
+            event.entity
 
-        val decision =
-            executionState.current()
-                ?: return
+        val supported =
+            mob is Zombie ||
+                mob is Pillager
 
-        if (
-            decision.confidence < 0.65
-        ) {
+        if (!supported) {
             return
         }
 
         if (
-            decision.priority < 50
+            mob is ZombieVillager
         ) {
             return
         }
 
-        val action =
-            decision.suggestedActions
-                .asSequence()
-                .map {
-                    actionParser.parse(it)
-                }
-                .firstOrNull {
-                    it != StrategyAction.NONE
-                }
-                ?: return
-
-        if (
-            action !=
-                StrategyAction.FOCUS_HIGH_PRESSURE_PLAYERS
-        ) {
-            return
-        }
-
-        val player =
+        val currentTarget =
             event.target as? Player
                 ?: return
 
         if (
-            !player.isOnline ||
-            player.isDead
+            !isValidPlayer(
+                currentTarget
+            )
         ) {
             return
         }
 
         if (
-            player.world.uid !=
-                monster.world.uid
-        ) {
-            return
-        }
-
-        val distanceSquared =
-            monster.location
-                .distanceSquared(
-                    player.location
-                )
-
-        if (
-            distanceSquared >
-                MAX_TARGET_DISTANCE_SQUARED
+            currentTarget.world.uid !=
+                mob.world.uid
         ) {
             return
         }
@@ -106,32 +81,396 @@ class HostileMobStrategyListener(
         val nowMillis =
             System.currentTimeMillis()
 
+        val aiDecision =
+            strategyExecutionState.current()
+
+        val minimumAiConfidence =
+            plugin.config
+                .getDouble(
+                    "ai.minimum-confidence",
+                    0.65
+                )
+                .coerceIn(
+                    0.0,
+                    1.0
+                )
+
+        val aiActions =
+            aiDecision
+                ?.takeIf {
+                    it.confidence >=
+                        minimumAiConfidence
+                }
+                ?.suggestedActions
+                ?.map {
+                    actionParser.parse(it)
+                }
+                ?.toSet()
+                ?: emptySet()
+
+        val aiAdaptive =
+            aiActions.contains(
+                StrategyAction.FOCUS_HIGH_PRESSURE_PLAYERS
+            ) ||
+                aiActions.contains(
+                    StrategyAction.ADAPTIVE_HOSTILE_TARGETING
+                ) ||
+                aiActions.contains(
+                    StrategyAction.INCREASE_HOSTILE_PRESSURE
+                )
+
+        val adaptiveEnabled =
+            plugin.config.getBoolean(
+                "adaptive-behaviour.enabled",
+                true
+            )
+
+        val targetingEnabled =
+            plugin.config.getBoolean(
+                "adaptive-behaviour.hostile-targeting.enabled",
+                true
+            )
+
+        if (
+            !adaptiveEnabled ||
+            !targetingEnabled
+        ) {
+            return
+        }
+
+        /*
+         * We only consider a retarget when the mob already has
+         * a player target. This keeps vanilla villager/animal
+         * targeting rules untouched.
+         */
+        val candidates =
+            mob.world.players
+                .asSequence()
+                .filter {
+                    isValidPlayer(it)
+                }
+                .filter {
+                    it.uniqueId !=
+                        currentTarget.uniqueId
+                }
+                .filter {
+                    mob.location
+                        .distanceSquared(
+                            it.location
+                        ) <=
+                        maximumRange *
+                        maximumRange
+                }
+                .toList()
+
+        if (
+            candidates.isEmpty()
+        ) {
+            return
+        }
+
+        val currentScore =
+            scorePlayer(
+                player =
+                    currentTarget,
+
+                mobX =
+                    mob.location.x,
+
+                mobY =
+                    mob.location.y,
+
+                mobZ =
+                    mob.location.z,
+
+                strategicPressure =
+                    if (
+                        aiAdaptive
+                    ) {
+                        1.0
+                    } else {
+                        0.0
+                    }
+            )
+
+        val bestCandidate =
+            candidates
+                .asSequence()
+                .map { candidate ->
+
+                    candidate to
+                        scorePlayer(
+                            player =
+                                candidate,
+
+                            mobX =
+                                mob.location.x,
+
+                            mobY =
+                                mob.location.y,
+
+                            mobZ =
+                                mob.location.z,
+
+                            strategicPressure =
+                                if (
+                                    aiAdaptive
+                                ) {
+                                    1.0
+                                } else {
+                                    0.0
+                                }
+                        )
+                }
+                .maxByOrNull {
+                    it.second.score
+                }
+                ?: return
+
+        val bestPlayer =
+            bestCandidate.first
+
+        val bestScore =
+            bestCandidate.second.score
+
+        if (
+            bestScore <=
+                currentScore.score
+        ) {
+            return
+        }
+
+        val effectiveAdvantage =
+            if (
+                aiActions.contains(
+                    StrategyAction.INCREASE_HOSTILE_PRESSURE
+                )
+            ) {
+                max(
+                    0.03,
+                    minimumAdvantage * 0.60
+                )
+            } else if (
+                aiAdaptive
+            ) {
+                max(
+                    0.05,
+                    minimumAdvantage * 0.80
+                )
+            } else {
+                minimumAdvantage
+            }
+
+        if (
+            bestScore -
+                currentScore.score <
+                effectiveAdvantage
+        ) {
+            return
+        }
+
+        val cooldownAction =
+            StrategyAction
+                .ADAPTIVE_HOSTILE_TARGETING
+
         if (
             !cooldownStore.isReady(
-                action,
+                cooldownAction,
                 nowMillis
             )
         ) {
             return
         }
 
-        /*
-         * The first execution mode is intentionally conservative:
-         * preserve vanilla target selection and confirm that the
-         * AI strategy permits the hostile target.
-         *
-         * Future strategy executors can replace this with ranked
-         * target selection based on actual player pressure.
-         */
+        event.setTarget(
+            bestPlayer
+        )
+
         cooldownStore.put(
             action =
-                action,
+                cooldownAction,
 
             cooldownMillis =
-                TARGET_SELECTION_COOLDOWN,
+                cooldownMillis,
 
             nowMillis =
                 nowMillis
         )
+
+        if (
+            plugin.config
+                .getBoolean(
+                    "plugin.debug",
+                    false
+                )
+        ) {
+
+            plugin.logger.info(
+                "Adaptive target: " +
+                    "${mob.type} " +
+                    "switched from " +
+                    currentTarget.name +
+                    " to " +
+                    bestPlayer.name +
+                    " (" +
+                    "%.2f".format(bestScore) +
+                    " > " +
+                    "%.2f".format(
+                        currentScore.score
+                    ) +
+                    ")"
+            )
+        }
+    }
+
+    private fun scorePlayer(
+        player: Player,
+        mobX: Double,
+        mobY: Double,
+        mobZ: Double,
+        strategicPressure: Double
+    ) = adaptiveTargetingEngine.score(
+        playerId =
+            player.uniqueId,
+
+        distanceSquared =
+            squareDistance(
+                player.x,
+                player.y,
+                player.z,
+                mobX,
+                mobY,
+                mobZ
+            ),
+
+        maximumDistance =
+            maximumRange,
+
+        intelligenceProfile =
+            intelligenceStore.get(
+                player.uniqueId
+            ),
+
+        socialThreat =
+            findSocialThreat(
+                player
+            ),
+
+        activityLevel =
+            intelligenceStore
+                .get(
+                    player.uniqueId
+                )
+                ?.score(
+                    io.github.mindzard.mythicinvasion
+                        .domain.intelligence.BehaviourArchetype.EXPLORER
+                )
+                ?: 0.0,
+
+        strategicPressure =
+            strategicPressure
+    )
+
+    private fun findSocialThreat(
+        player: Player
+    ): Double {
+
+        val settlements =
+            societyStateStore
+                .current()
+                .settlements
+                .values
+
+        val nearestSettlement =
+            settlements
+                .asSequence()
+                .filter {
+                    it.worldName ==
+                        player.world.name
+                }
+                .map { settlement ->
+
+                    val dx =
+                        player.location.blockX -
+                            settlement.centerX
+
+                    val dy =
+                        player.location.blockY -
+                            settlement.centerY
+
+                    val dz =
+                        player.location.blockZ -
+                            settlement.centerZ
+
+                    val distanceSquared =
+                        dx.toDouble() * dx +
+                            dy.toDouble() * dy +
+                            dz.toDouble() * dz
+
+                    settlement to
+                        distanceSquared
+                }
+                .filter { (settlement, distanceSquared) ->
+                    distanceSquared <=
+                        settlement.radius *
+                        settlement.radius
+                }
+                .minByOrNull {
+                    it.second
+                }
+                ?.first
+                ?: return 0.0
+
+        val social =
+            settlementSocialStore.get(
+                nearestSettlement.settlementId
+            )
+                ?: return 0.0
+
+        return (
+            social.hostilePlayers[
+                player.uniqueId
+            ]
+                ?: 0.0
+            )
+            .coerceIn(
+                0.0,
+                1.0
+            )
+    }
+
+    private fun isValidPlayer(
+        player: Player
+    ): Boolean {
+
+        return player.isOnline &&
+            !player.isDead &&
+            player.gameMode !=
+            GameMode.SPECTATOR
+    }
+
+    private fun squareDistance(
+        x1: Double,
+        y1: Double,
+        z1: Double,
+        x2: Double,
+        y2: Double,
+        z2: Double
+    ): Double {
+
+        val dx =
+            x1 - x2
+
+        val dy =
+            y1 - y2
+
+        val dz =
+            z1 - z2
+
+        return (
+            dx * dx +
+                dy * dy +
+                dz * dz
+            )
     }
 }
