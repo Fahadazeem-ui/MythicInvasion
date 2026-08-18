@@ -15,30 +15,23 @@ class AiStrategyCoordinator(
     private val contextAssembler: AiContextAssembler,
     private val geminiClient: GeminiStrategyClient,
     private val validator: AiDecisionValidator,
+    private val executionState: StrategyExecutionState,
     private val updateIntervalMillis: () -> Long,
     private val maxContextCharacters: Int
 ) {
 
     private var job: Job? = null
 
-    @Volatile
-    private var latestDecision: AiDecision? = null
-
     fun start() {
 
-        if (
-            job != null
-        ) {
+        if (job != null) {
             return
         }
 
-        if (
-            !geminiClient.isConfigured()
-        ) {
+        if (!geminiClient.isConfigured()) {
 
             plugin.logger.warning(
-                "AI strategy layer is enabled, " +
-                    "but GOOGLE_API_KEY is not configured."
+                "Gemini AI is enabled but no API key is configured."
             )
 
             return
@@ -62,8 +55,7 @@ class AiStrategyCoordinator(
                         val contextJson =
                             contextAssembler
                                 .toJson(
-                                    context =
-                                        context,
+                                    context = context,
                                     maximumCharacters =
                                         maxContextCharacters
                                 )
@@ -74,21 +66,18 @@ class AiStrategyCoordinator(
                                     contextJson
                                 )
 
-                        if (
-                            decision != null
-                        ) {
+                        if (decision != null) {
 
                             val validated =
                                 validator.validate(
                                     decision
                                 )
 
-                            if (
-                                validated != null
-                            ) {
+                            if (validated != null) {
 
-                                latestDecision =
+                                executionState.update(
                                     validated
+                                )
 
                                 plugin.logger.info(
                                     "AI strategy accepted: " +
@@ -99,13 +88,6 @@ class AiStrategyCoordinator(
                                         "%.2f".format(
                                             validated.confidence
                                         )
-                                )
-
-                            } else {
-
-                                plugin.logger.warning(
-                                    "AI strategy was rejected " +
-                                        "by the local validator."
                                 )
                             }
                         }
@@ -129,14 +111,15 @@ class AiStrategyCoordinator(
     }
 
     fun currentDecision(): AiDecision? {
-        return latestDecision
+        return executionState.current()
     }
 
     fun stop() {
 
         job?.cancel()
         job = null
-        latestDecision = null
+
+        executionState.clear()
 
         plugin.logger.info(
             "Gemini AI strategy coordinator stopped."
