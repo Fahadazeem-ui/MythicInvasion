@@ -1,5 +1,9 @@
 package io.github.mindzard.mythicinvasion.infrastructure.paper.player
 
+import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourEventBuffer
+import io.github.mindzard.mythicinvasion.domain.behaviour.BehaviourAction
+import io.github.mindzard.mythicinvasion.domain.behaviour.BehaviourEvent
+import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
@@ -7,31 +11,34 @@ import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.player.PlayerJoinEvent
-import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerMoveEvent
-import org.bukkit.entity.Player
+import org.bukkit.event.player.PlayerQuitEvent
 
-class PlayerBehaviourListener : Listener {
+class PlayerBehaviourListener(
+    private val buffer: BehaviourEventBuffer
+) : Listener {
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(
+        priority = EventPriority.MONITOR,
+        ignoreCancelled = true
+    )
     fun onPlayerJoin(event: PlayerJoinEvent) {
-        val player = event.player
-
         record(
-            player = player,
-            action = "JOIN",
-            details = "Player joined the server."
+            player = event.player,
+            action = BehaviourAction.JOIN,
+            target = null
         )
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(
+        priority = EventPriority.MONITOR,
+        ignoreCancelled = true
+    )
     fun onPlayerQuit(event: PlayerQuitEvent) {
-        val player = event.player
-
         record(
-            player = player,
-            action = "QUIT",
-            details = "Player left the server."
+            player = event.player,
+            action = BehaviourAction.QUIT,
+            target = null
         )
     }
 
@@ -40,13 +47,10 @@ class PlayerBehaviourListener : Listener {
         ignoreCancelled = true
     )
     fun onBlockBreak(event: BlockBreakEvent) {
-        val player = event.player
-        val block = event.block
-
         record(
-            player = player,
-            action = "BLOCK_BREAK",
-            details = "block=${block.type.key}"
+            player = event.player,
+            action = BehaviourAction.BLOCK_BREAK,
+            target = event.block.type.key.toString()
         )
     }
 
@@ -55,13 +59,10 @@ class PlayerBehaviourListener : Listener {
         ignoreCancelled = true
     )
     fun onBlockPlace(event: BlockPlaceEvent) {
-        val player = event.player
-        val block = event.blockPlaced
-
         record(
-            player = player,
-            action = "BLOCK_PLACE",
-            details = "block=${block.type.key}"
+            player = event.player,
+            action = BehaviourAction.BLOCK_PLACE,
+            target = event.blockPlaced.type.key.toString()
         )
     }
 
@@ -70,16 +71,14 @@ class PlayerBehaviourListener : Listener {
         ignoreCancelled = true
     )
     fun onEntityDamage(event: EntityDamageByEntityEvent) {
-        val damager = event.damager
 
-        if (damager !is Player) {
-            return
-        }
+        val player = event.damager as? Player
+            ?: return
 
         record(
-            player = damager,
-            action = "COMBAT",
-            details = "target=${event.entity.type.key}"
+            player = player,
+            action = BehaviourAction.COMBAT,
+            target = event.entity.type.key.toString()
         )
     }
 
@@ -88,17 +87,14 @@ class PlayerBehaviourListener : Listener {
         ignoreCancelled = true
     )
     fun onPlayerMove(event: PlayerMoveEvent) {
+
         val from = event.from
         val to = event.to ?: return
 
         /*
-         * PlayerMoveEvent can fire extremely frequently.
+         * Ignore pure camera movement.
          *
-         * We intentionally ignore movement where the player only
-         * changed their camera direction.
-         *
-         * This means the behaviour system receives movement information
-         * only when the player actually changes block position.
+         * A PlayerMoveEvent can fire extremely frequently.
          */
         if (
             from.blockX == to.blockX &&
@@ -111,34 +107,30 @@ class PlayerBehaviourListener : Listener {
 
         record(
             player = event.player,
-            action = "MOVE",
-            details = "world=${to.world.name},x=${to.blockX},y=${to.blockY},z=${to.blockZ}"
+            action = BehaviourAction.MOVE,
+            target = null
         )
     }
 
     private fun record(
         player: Player,
-        action: String,
-        details: String
+        action: BehaviourAction,
+        target: String?
     ) {
-        /*
-         * This is intentionally lightweight.
-         *
-         * We are NOT doing database writes,
-         * network requests, AI calls, or expensive calculations
-         * inside Minecraft event handlers.
-         *
-         * The next behaviour-system layer will consume these events
-         * through a dedicated buffer and asynchronous processor.
-         */
-        player.server.pluginManager
-            .getPlugin("MythicInvasion")
-            ?.logger
-            ?.fine(
-                "BehaviourEvent player=${player.uniqueId} " +
-                    "name=${player.name} " +
-                    "action=$action " +
-                    "details=$details"
+        val location = player.location
+
+        buffer.add(
+            BehaviourEvent(
+                playerId = player.uniqueId,
+                playerName = player.name,
+                action = action,
+                worldName = location.world.name,
+                x = location.blockX,
+                y = location.blockY,
+                z = location.blockZ,
+                target = target,
+                timestampMillis = System.currentTimeMillis()
             )
+        )
     }
 }
