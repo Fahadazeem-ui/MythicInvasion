@@ -63,10 +63,6 @@ class MythicInvasionPlugin : JavaPlugin() {
 
             try {
 
-                /*
-                 * Stop AI first so no new strategic request can
-                 * begin during the rest of shutdown.
-                 */
                 if (
                     services
                         .isAiStrategyCoordinatorInitialized()
@@ -75,17 +71,9 @@ class MythicInvasionPlugin : JavaPlugin() {
                     services
                         .aiStrategyCoordinator
                         .stop()
-
-                    logger.info(
-                        "AI strategy coordinator stopped."
-                    )
                 }
 
                 services.behaviourProcessor.stop()
-
-                logger.info(
-                    "Behaviour processor stopped."
-                )
 
                 services.settlementSocialCoordinator.stop()
 
@@ -98,6 +86,10 @@ class MythicInvasionPlugin : JavaPlugin() {
                 services.worldIntelligenceCoordinator.stop()
 
                 services.ecosystemCoordinator.stop()
+
+                services.strategyCooldownStore.clear()
+
+                services.strategyExecutionState.clear()
 
                 services.coroutineEngine.shutdown()
 
@@ -121,7 +113,9 @@ class MythicInvasionPlugin : JavaPlugin() {
                     "All in-memory intelligence state cleared."
                 )
 
-            } catch (exception: Exception) {
+            } catch (
+                exception: Exception
+            ) {
 
                 logger.severe(
                     "Error while shutting down MythicInvasion services."
