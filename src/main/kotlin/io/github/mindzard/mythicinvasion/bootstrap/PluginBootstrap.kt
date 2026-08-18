@@ -18,12 +18,14 @@ import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemEngine
 import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceEngine
 import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceStore
 import io.github.mindzard.mythicinvasion.application.society.FactionRelationService
+import io.github.mindzard.mythicinvasion.application.society.PillagerFactionCoordinator
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationCoordinator
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationEngine
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialCoordinator
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialEngine
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialStore
 import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
+import io.github.mindzard.mythicinvasion.application.society.VillagerCitizenCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipEngine
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipStore
@@ -55,9 +57,7 @@ class PluginBootstrap(
             ServiceRegistry()
 
         val configurationManager =
-            ConfigurationManager(
-                plugin
-            )
+            ConfigurationManager(plugin)
 
         configurationManager.load()
 
@@ -66,27 +66,21 @@ class PluginBootstrap(
         )
 
         val coroutineEngine =
-            CoroutineEngine(
-                plugin
-            )
+            CoroutineEngine(plugin)
 
         registry.registerCoroutineEngine(
             coroutineEngine
         )
 
         val playerSnapshotCollector =
-            PlayerSnapshotCollector(
-                plugin
-            )
+            PlayerSnapshotCollector(plugin)
 
         registry.registerPlayerSnapshotCollector(
             playerSnapshotCollector
         )
 
         val ecosystemEngine =
-            EcosystemEngine(
-                plugin
-            )
+            EcosystemEngine(plugin)
 
         registry.registerEcosystemEngine(
             ecosystemEngine
@@ -181,9 +175,7 @@ class PluginBootstrap(
         )
 
         val worldSnapshotCollector =
-            WorldSnapshotCollector(
-                plugin
-            )
+            WorldSnapshotCollector(plugin)
 
         registry.registerWorldSnapshotCollector(
             worldSnapshotCollector
@@ -226,9 +218,7 @@ class PluginBootstrap(
         )
 
         val settlementObservationCollector =
-            SettlementObservationCollector(
-                plugin
-            )
+            SettlementObservationCollector(plugin)
 
         registry.registerSettlementObservationCollector(
             settlementObservationCollector
@@ -278,9 +268,7 @@ class PluginBootstrap(
         )
 
         val villagerObservationCollector =
-            VillagerObservationCollector(
-                plugin
-            )
+            VillagerObservationCollector(plugin)
 
         registry.registerVillagerObservationCollector(
             villagerObservationCollector
@@ -368,6 +356,62 @@ class PluginBootstrap(
             villagerRelationshipCoordinator
         )
 
+        val villagerCitizenCoordinator =
+            VillagerCitizenCoordinator(
+                plugin =
+                    plugin,
+                coroutineEngine =
+                    coroutineEngine,
+                stateStore =
+                    societyStateStore,
+                relationshipStore =
+                    villagerRelationshipStore,
+                updateIntervalMillis = {
+                    configurationManager
+                        .villagerCitizenUpdateIntervalMillis()
+                },
+                interactionRadius =
+                    configurationManager
+                        .villagerCitizenInteractionRadius(),
+                hostileRadius =
+                    configurationManager
+                        .villagerCitizenHostileRadius(),
+                friendlyLookRadius =
+                    configurationManager
+                        .villagerCitizenFriendlyLookRadius(),
+                hostileThreatThreshold =
+                    configurationManager
+                        .villagerCitizenHostileThreatThreshold(),
+                friendlyTrustThreshold =
+                    configurationManager
+                        .villagerCitizenFriendlyTrustThreshold(),
+                actionCooldownMillis =
+                    configurationManager
+                        .villagerCitizenActionCooldownMillis()
+            )
+
+        registry.registerVillagerCitizenCoordinator(
+            villagerCitizenCoordinator
+        )
+
+        val pillagerFactionCoordinator =
+            PillagerFactionCoordinator(
+                plugin =
+                    plugin,
+                coroutineEngine =
+                    coroutineEngine,
+                stateStore =
+                    societyStateStore,
+                updateIntervalMillis = {
+                    configurationManager
+                        .pillagerFactionUpdateIntervalMillis()
+                }
+            )
+
+        registry.registerPillagerFactionCoordinator(
+            pillagerFactionCoordinator
+        )
+
         val settlementSocialEngine =
             SettlementSocialEngine()
 
@@ -404,12 +448,6 @@ class PluginBootstrap(
             settlementSocialCoordinator
         )
 
-        /*
-         * =========================================================
-         * STRATEGY RUNTIME
-         * =========================================================
-         */
-
         val strategyExecutionState =
             StrategyExecutionState()
 
@@ -430,12 +468,6 @@ class PluginBootstrap(
         registry.registerStrategyCooldownStore(
             strategyCooldownStore
         )
-
-        /*
-         * =========================================================
-         * AI STRATEGY LAYER
-         * =========================================================
-         */
 
         if (
             configurationManager.isAiEnabled() &&
@@ -518,15 +550,10 @@ class PluginBootstrap(
             )
         }
 
-        /*
-         * =========================================================
-         * ADAPTIVE HOSTILE TARGETING
-         * =========================================================
-         */
-
         if (
             configurationManager
-                .isAdaptiveBehaviourEnabled() &&
+                .isAdaptiveBehaviourEnabled()
+            &&
             configurationManager
                 .isAdaptiveHostileTargetingEnabled()
         ) {
@@ -538,53 +565,33 @@ class PluginBootstrap(
                 HostileMobStrategyListener(
                     plugin =
                         plugin,
-
                     intelligenceStore =
                         behaviourIntelligenceStore,
-
                     societyStateStore =
                         societyStateStore,
-
                     settlementSocialStore =
                         settlementSocialStore,
-
                     strategyExecutionState =
                         strategyExecutionState,
-
                     actionParser =
                         strategyActionParser,
-
                     cooldownStore =
                         strategyCooldownStore,
-
                     adaptiveTargetingEngine =
                         adaptiveTargetingEngine,
-
                     maximumRange =
                         configurationManager
                             .adaptiveTargetRange(),
-
                     minimumAdvantage =
                         configurationManager
                             .adaptiveTargetMinimumAdvantage(),
-
                     cooldownMillis =
                         configurationManager
                             .adaptiveTargetCooldownMillis()
                 ),
                 plugin
             )
-
-            plugin.logger.info(
-                "Adaptive hostile targeting enabled."
-            )
         }
-
-        /*
-         * =========================================================
-         * EXISTING PLAYER BEHAVIOUR EVENTS
-         * =========================================================
-         */
 
         plugin.server.pluginManager.registerEvents(
             PlayerBehaviourListener(
@@ -593,12 +600,6 @@ class PluginBootstrap(
             ),
             plugin
         )
-
-        /*
-         * =========================================================
-         * DEBUG COMMAND
-         * =========================================================
-         */
 
         plugin.getCommand(
             "society"
@@ -610,12 +611,6 @@ class PluginBootstrap(
                     settlementSocialStore
             )
         )
-
-        /*
-         * =========================================================
-         * START BACKGROUND SUBSYSTEMS
-         * =========================================================
-         */
 
         if (
             configurationManager
@@ -650,6 +645,22 @@ class PluginBootstrap(
             villagerRelationshipCoordinator.start()
 
             settlementSocialCoordinator.start()
+
+            if (
+                configurationManager
+                    .isVillagerCitizenBehaviourEnabled()
+            ) {
+
+                villagerCitizenCoordinator.start()
+            }
+
+            if (
+                configurationManager
+                    .isPillagerFactionIntelligenceEnabled()
+            ) {
+
+                pillagerFactionCoordinator.start()
+            }
         }
 
         plugin.logger.info(
