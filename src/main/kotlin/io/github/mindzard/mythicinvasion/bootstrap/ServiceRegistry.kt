@@ -8,12 +8,17 @@ import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemCoordina
 import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemEngine
 import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceEngine
 import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceStore
+import io.github.mindzard.mythicinvasion.application.society.FactionRelationService
+import io.github.mindzard.mythicinvasion.application.society.SettlementObservationCoordinator
+import io.github.mindzard.mythicinvasion.application.society.SettlementObservationEngine
+import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
 import io.github.mindzard.mythicinvasion.application.world.WorldIntelligenceCoordinator
 import io.github.mindzard.mythicinvasion.application.world.WorldIntelligenceEngine
 import io.github.mindzard.mythicinvasion.application.world.WorldStateStore
 import io.github.mindzard.mythicinvasion.concurrency.CoroutineEngine
 import io.github.mindzard.mythicinvasion.config.ConfigurationManager
 import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.PlayerSnapshotCollector
+import io.github.mindzard.mythicinvasion.infrastructure.paper.society.SettlementObservationCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.world.WorldSnapshotCollector
 
 class ServiceRegistry {
@@ -61,6 +66,21 @@ class ServiceRegistry {
         private set
 
     lateinit var worldIntelligenceCoordinator: WorldIntelligenceCoordinator
+        private set
+
+    lateinit var settlementObservationCollector: SettlementObservationCollector
+        private set
+
+    lateinit var settlementObservationEngine: SettlementObservationEngine
+        private set
+
+    lateinit var societyStateStore: SocietyStateStore
+        private set
+
+    lateinit var factionRelationService: FactionRelationService
+        private set
+
+    lateinit var settlementObservationCoordinator: SettlementObservationCoordinator
         private set
 
     fun registerConfigurationManager(
@@ -151,5 +171,35 @@ class ServiceRegistry {
         coordinator: WorldIntelligenceCoordinator
     ) {
         worldIntelligenceCoordinator = coordinator
+    }
+
+    fun registerSettlementObservationCollector(
+        collector: SettlementObservationCollector
+    ) {
+        settlementObservationCollector = collector
+    }
+
+    fun registerSettlementObservationEngine(
+        engine: SettlementObservationEngine
+    ) {
+        settlementObservationEngine = engine
+    }
+
+    fun registerSocietyStateStore(
+        store: SocietyStateStore
+    ) {
+        societyStateStore = store
+    }
+
+    fun registerFactionRelationService(
+        service: FactionRelationService
+    ) {
+        factionRelationService = service
+    }
+
+    fun registerSettlementObservationCoordinator(
+        coordinator: SettlementObservationCoordinator
+    ) {
+        settlementObservationCoordinator = coordinator
     }
 }
