@@ -45,10 +45,6 @@ class MythicInvasionPlugin : JavaPlugin() {
 
             exception.printStackTrace()
 
-            /*
-             * Disable the plugin if a critical startup
-             * dependency fails.
-             */
             server.pluginManager.disablePlugin(this)
         }
     }
@@ -64,10 +60,8 @@ class MythicInvasionPlugin : JavaPlugin() {
             try {
 
                 /*
-                 * Stop behaviour processing first.
-                 *
-                 * This also drains the remaining in-memory
-                 * behaviour events into the profile store.
+                 * Stop behaviour processing first so that pending
+                 * in-memory observations can be consumed.
                  */
                 services.behaviourProcessor.stop()
 
@@ -76,8 +70,7 @@ class MythicInvasionPlugin : JavaPlugin() {
                 )
 
                 /*
-                 * Stop the ecosystem coordinator so it
-                 * cannot schedule any new ecosystem work.
+                 * Stop ecosystem processing.
                  */
                 services.ecosystemCoordinator.stop()
 
@@ -86,7 +79,7 @@ class MythicInvasionPlugin : JavaPlugin() {
                 )
 
                 /*
-                 * Stop all plugin-owned coroutine work.
+                 * Stop plugin-owned asynchronous work.
                  */
                 services.coroutineEngine.shutdown()
 
@@ -95,17 +88,19 @@ class MythicInvasionPlugin : JavaPlugin() {
                 )
 
                 /*
-                 * Clear in-memory behaviour data.
-                 *
-                 * We do not keep references to Bukkit players,
-                 * worlds, or other server objects here.
+                 * Clear behaviour data.
                  */
                 services.behaviourProfileStore.clear()
 
                 services.behaviourEventBuffer.clear()
 
+                /*
+                 * Clear AI-facing intelligence data.
+                 */
+                services.behaviourIntelligenceStore.clear()
+
                 logger.info(
-                    "Behaviour memory cleared."
+                    "Behaviour and intelligence memory cleared."
                 )
 
             } catch (exception: Exception) {
