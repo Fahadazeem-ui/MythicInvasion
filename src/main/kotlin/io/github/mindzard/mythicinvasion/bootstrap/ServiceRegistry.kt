@@ -8,9 +8,13 @@ import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemCoordina
 import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemEngine
 import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceEngine
 import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceStore
+import io.github.mindzard.mythicinvasion.application.world.WorldIntelligenceCoordinator
+import io.github.mindzard.mythicinvasion.application.world.WorldIntelligenceEngine
+import io.github.mindzard.mythicinvasion.application.world.WorldStateStore
 import io.github.mindzard.mythicinvasion.concurrency.CoroutineEngine
 import io.github.mindzard.mythicinvasion.config.ConfigurationManager
 import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.PlayerSnapshotCollector
+import io.github.mindzard.mythicinvasion.infrastructure.paper.world.WorldSnapshotCollector
 
 class ServiceRegistry {
 
@@ -45,6 +49,18 @@ class ServiceRegistry {
         private set
 
     lateinit var behaviourIntelligenceStore: BehaviourIntelligenceStore
+        private set
+
+    lateinit var worldSnapshotCollector: WorldSnapshotCollector
+        private set
+
+    lateinit var worldIntelligenceEngine: WorldIntelligenceEngine
+        private set
+
+    lateinit var worldStateStore: WorldStateStore
+        private set
+
+    lateinit var worldIntelligenceCoordinator: WorldIntelligenceCoordinator
         private set
 
     fun registerConfigurationManager(
@@ -111,5 +127,29 @@ class ServiceRegistry {
         store: BehaviourIntelligenceStore
     ) {
         behaviourIntelligenceStore = store
+    }
+
+    fun registerWorldSnapshotCollector(
+        collector: WorldSnapshotCollector
+    ) {
+        worldSnapshotCollector = collector
+    }
+
+    fun registerWorldIntelligenceEngine(
+        engine: WorldIntelligenceEngine
+    ) {
+        worldIntelligenceEngine = engine
+    }
+
+    fun registerWorldStateStore(
+        store: WorldStateStore
+    ) {
+        worldStateStore = store
+    }
+
+    fun registerWorldIntelligenceCoordinator(
+        coordinator: WorldIntelligenceCoordinator
+    ) {
+        worldIntelligenceCoordinator = coordinator
     }
 }
