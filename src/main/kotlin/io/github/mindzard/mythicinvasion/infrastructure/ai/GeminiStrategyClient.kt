@@ -2,6 +2,8 @@ package io.github.mindzard.mythicinvasion.infrastructure.ai
 
 import com.google.genai.Client
 import com.google.genai.types.GenerateContentConfig
+import com.google.genai.types.HttpOptions
+import com.google.genai.types.HttpRetryOptions
 import io.github.mindzard.mythicinvasion.domain.ai.AiDecision
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -35,9 +37,41 @@ class GeminiStrategyClient(
                 it.isNotEmpty()
             }
             ?.let { key ->
+
                 Client
                     .builder()
                     .apiKey(key)
+                    .httpOptions(
+                        HttpOptions
+                            .builder()
+                            .apiVersion("v1")
+                            .timeout(
+                                timeoutMillis
+                                    .coerceIn(
+                                        30_000,
+                                        120_000
+                                    )
+                            )
+                            .retryOptions(
+                                HttpRetryOptions
+                                    .builder()
+                                    .attempts(3)
+                                    .httpStatusCodes(
+                                        408,
+                                        429,
+                                        500,
+                                        502,
+                                        503,
+                                        504
+                                    )
+                                    .initialDelay(1.0)
+                                    .maxDelay(8.0)
+                                    .expBase(2.0)
+                                    .jitter(0.25)
+                                    .build()
+                            )
+                            .build()
+                    )
                     .build()
             }
 
@@ -60,6 +94,13 @@ class GeminiStrategyClient(
 
         return try {
 
+            val requestTimeoutMillis =
+                timeoutMillis
+                    .coerceIn(
+                        30_000,
+                        120_000
+                    )
+
             val future =
                 activeClient
                     .async
@@ -78,16 +119,22 @@ class GeminiStrategyClient(
             val response =
                 future
                     .orTimeout(
-                        timeoutMillis,
+                        requestTimeoutMillis,
                         TimeUnit.MILLISECONDS
                     )
                     .get()
 
+            val responseText =
+                response
+                    .text()
+
             parseDecision(
-                response.text()
+                responseText
             )
 
-        } catch (exception: Exception) {
+        } catch (
+            exception: Exception
+        ) {
 
             plugin.logger.warning(
                 "Gemini strategy request failed: " +
@@ -112,8 +159,10 @@ class GeminiStrategyClient(
             Return exactly one high-level strategic decision.
 
             The decision must:
+
             - be believable;
             - use only supplied world information;
+            - never invent unavailable facts;
             - avoid impossible actions;
             - preserve player agency;
             - avoid repetitive escalation;
@@ -121,7 +170,7 @@ class GeminiStrategyClient(
             - consider social relationships;
             - be executable later by a deterministic local engine.
 
-            Return ONLY valid JSON:
+            Return ONLY valid JSON with this structure:
 
             {
               "strategyId": "string",
@@ -129,7 +178,9 @@ class GeminiStrategyClient(
               "summary": "string",
               "reasoning": "string",
               "confidence": 0.0,
-              "suggestedActions": ["string"]
+              "suggestedActions": [
+                "string"
+              ]
             }
 
             World context:
@@ -155,7 +206,8 @@ class GeminiStrategyClient(
                     rawText
                 )
 
-            val root =
+            val root:
+                JsonObject =
                 json
                     .parseToJsonElement(
                         cleaned
@@ -246,6 +298,10 @@ class GeminiStrategyClient(
                 "Gemini returned invalid JSON."
             )
 
+            plugin.logger.fine(
+                "Gemini response: $rawText"
+            )
+
             null
         }
     }
@@ -304,9 +360,11 @@ class GeminiStrategyClient(
 
         val primitive:
             JsonPrimitive =
-            element.jsonPrimitive
+            element
+                .jsonPrimitive
 
-        return primitive.content
+        return primitive
+            .content
             .trim()
             .ifBlank {
                 null
@@ -345,10 +403,9 @@ class GeminiStrategyClient(
 
         return array.mapNotNull { item ->
 
-            val primitive =
-                item.jsonPrimitive
-
-            primitive.content
+            item
+                .jsonPrimitive
+                .content
                 .trim()
                 .ifBlank {
                     null
