@@ -9,6 +9,7 @@ data class SettlementState(
     val centerZ: Int,
     val radius: Int = 32,
     val population: Int = 0,
+    val guardCount: Int = 0,
     val foodLevel: Double = 1.0,
     val safetyLevel: Double = 1.0,
     val prosperityLevel: Double = 0.0,
@@ -35,6 +36,10 @@ data class SettlementState(
 
         require(population >= 0) {
             "Settlement population cannot be negative."
+        }
+
+        require(guardCount >= 0) {
+            "Settlement guard count cannot be negative."
         }
 
         require(foodLevel in 0.0..1.0) {
