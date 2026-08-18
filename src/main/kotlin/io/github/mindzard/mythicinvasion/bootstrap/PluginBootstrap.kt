@@ -1,6 +1,9 @@
 package io.github.mindzard.mythicinvasion.bootstrap
 
 import io.github.mindzard.mythicinvasion.MythicInvasionPlugin
+import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourEventBuffer
+import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourProcessor
+import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourProfileStore
 import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemCoordinator
 import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemEngine
 import io.github.mindzard.mythicinvasion.concurrency.CoroutineEngine
@@ -13,6 +16,7 @@ class PluginBootstrap(
 ) {
 
     fun start(): ServiceRegistry {
+
         val registry = ServiceRegistry()
 
         val configurationManager =
@@ -63,16 +67,49 @@ class PluginBootstrap(
         )
 
         /*
-         * Register the player behaviour listener with Bukkit/Paper.
-         *
-         * From this point onward Minecraft will send relevant
-         * player events to PlayerBehaviourListener.
+         * Behaviour subsystem.
+         */
+
+        val behaviourEventBuffer =
+            BehaviourEventBuffer()
+
+        registry.registerBehaviourEventBuffer(
+            behaviourEventBuffer
+        )
+
+        val behaviourProfileStore =
+            BehaviourProfileStore()
+
+        registry.registerBehaviourProfileStore(
+            behaviourProfileStore
+        )
+
+        val behaviourProcessor =
+            BehaviourProcessor(
+                plugin = plugin,
+                coroutineEngine = coroutineEngine,
+                buffer = behaviourEventBuffer,
+                profileStore = behaviourProfileStore
+            )
+
+        registry.registerBehaviourProcessor(
+            behaviourProcessor
+        )
+
+        /*
+         * Register Minecraft event listeners.
          */
         plugin.server.pluginManager.registerEvents(
-            PlayerBehaviourListener(),
+            PlayerBehaviourListener(
+                buffer = behaviourEventBuffer
+            ),
             plugin
         )
 
+        /*
+         * Start background processing.
+         */
+        behaviourProcessor.start()
         ecosystemCoordinator.start()
 
         plugin.logger.info(
@@ -88,11 +125,23 @@ class PluginBootstrap(
         )
 
         plugin.logger.info(
-            "Player behaviour listener registered."
+            "Ecosystem engine initialized."
         )
 
         plugin.logger.info(
-            "Ecosystem engine initialized."
+            "Behaviour event buffer initialized."
+        )
+
+        plugin.logger.info(
+            "Behaviour profile store initialized."
+        )
+
+        plugin.logger.info(
+            "Behaviour processor started."
+        )
+
+        plugin.logger.info(
+            "Player behaviour listener registered."
         )
 
         return registry
