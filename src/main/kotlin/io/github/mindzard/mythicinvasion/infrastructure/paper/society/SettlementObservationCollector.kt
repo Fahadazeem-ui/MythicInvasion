@@ -2,10 +2,9 @@ package io.github.mindzard.mythicinvasion.infrastructure.paper.society
 
 import io.github.mindzard.mythicinvasion.domain.society.SettlementObservation
 import org.bukkit.Location
-import org.bukkit.plugin.java.JavaPlugin
-import org.bukkit.entity.Entity
 import org.bukkit.entity.IronGolem
 import org.bukkit.entity.Villager
+import org.bukkit.plugin.java.JavaPlugin
 import kotlin.math.floor
 import kotlin.math.sqrt
 
@@ -14,6 +13,7 @@ class SettlementObservationCollector(
 ) {
 
     companion object {
+
         private const val GRID_SIZE = 64
         private const val MAX_CLUSTER_DISTANCE = 72.0
         private const val MIN_SETTLEMENT_POPULATION = 2
@@ -36,7 +36,9 @@ class SettlementObservationCollector(
                 world.entities
                     .asSequence()
                     .filterIsInstance<Villager>()
-                    .filter { !it.isDead }
+                    .filter {
+                        !it.isDead
+                    }
                     .toList()
 
             if (
@@ -50,12 +52,16 @@ class SettlementObservationCollector(
                 world.entities
                     .asSequence()
                     .filterIsInstance<IronGolem>()
-                    .filter { !it.isDead }
+                    .filter {
+                        !it.isDead
+                    }
                     .toList()
 
             val clusters =
                 mergeNearbyClusters(
-                    clusterVillagers(villagers)
+                    clusterVillagers(
+                        villagers
+                    )
                 )
 
             for (cluster in clusters) {
@@ -67,21 +73,32 @@ class SettlementObservationCollector(
                     continue
                 }
 
-                val centerX =
+                /*
+                 * SettlementObservation uses integer block
+                 * coordinates. Make the conversion explicit here
+                 * so no Double value can leak into the model.
+                 */
+                val centerX: Int =
                     cluster
-                        .map { it.location.blockX }
+                        .map {
+                            it.location.blockX
+                        }
                         .average()
                         .toInt()
 
-                val centerY =
+                val centerY: Int =
                     cluster
-                        .map { it.location.blockY }
+                        .map {
+                            it.location.blockY
+                        }
                         .average()
                         .toInt()
 
-                val centerZ =
+                val centerZ: Int =
                     cluster
-                        .map { it.location.blockZ }
+                        .map {
+                            it.location.blockZ
+                        }
                         .average()
                         .toInt()
 
@@ -99,16 +116,20 @@ class SettlementObservationCollector(
                             centerY,
                             centerZ
                         ) <=
-                            SETTLEMENT_RADIUS *
-                            SETTLEMENT_RADIUS
+                            SETTLEMENT_RADIUS.toDouble() *
+                            SETTLEMENT_RADIUS.toDouble()
                     }
 
                 val settlementId =
                     createStableSettlementId(
-                        worldName = world.name,
-                        centerX = centerX,
-                        centerY = centerY,
-                        centerZ = centerZ
+                        worldName =
+                            world.name,
+                        centerX =
+                            centerX,
+                        centerY =
+                            centerY,
+                        centerZ =
+                            centerZ
                     )
 
                 observations.add(
@@ -118,9 +139,12 @@ class SettlementObservationCollector(
 
                         name =
                             createSettlementName(
-                                worldName = world.name,
-                                centerX = centerX,
-                                centerZ = centerZ
+                                worldName =
+                                    world.name,
+                                centerX =
+                                    centerX,
+                                centerZ =
+                                    centerZ
                             ),
 
                         worldName =
@@ -158,14 +182,18 @@ class SettlementObservationCollector(
         villagers: List<Villager>
     ): List<List<Villager>> {
 
-        if (villagers.isEmpty()) {
+        if (
+            villagers.isEmpty()
+        ) {
             return emptyList()
         }
 
         val cellMap =
             HashMap<GridCell, MutableList<Int>>()
 
-        villagers.forEachIndexed { index, villager ->
+        villagers.forEachIndexed {
+            index,
+            villager ->
 
             val location =
                 villager.location
@@ -174,12 +202,14 @@ class SettlementObservationCollector(
                 GridCell(
                     x =
                         floor(
-                            location.x / GRID_SIZE
+                            location.x /
+                                GRID_SIZE.toDouble()
                         ).toInt(),
 
                     z =
                         floor(
-                            location.z / GRID_SIZE
+                            location.z /
+                                GRID_SIZE.toDouble()
                         ).toInt()
                 )
 
@@ -191,18 +221,24 @@ class SettlementObservationCollector(
         }
 
         val parent =
-            IntArray(villagers.size) {
+            IntArray(
+                villagers.size
+            ) {
                 it
             }
 
-        fun find(value: Int): Int {
+        fun find(
+            value: Int
+        ): Int {
 
             var current =
                 value
 
             while (
-                parent[current] != current
+                parent[current] !=
+                current
             ) {
+
                 parent[current] =
                     parent[parent[current]]
 
@@ -225,8 +261,10 @@ class SettlementObservationCollector(
                 find(second)
 
             if (
-                rootFirst != rootSecond
+                rootFirst !=
+                rootSecond
             ) {
+
                 parent[rootSecond] =
                     rootFirst
             }
@@ -243,18 +281,21 @@ class SettlementObservationCollector(
                 GridCell(
                     x =
                         floor(
-                            location.x / GRID_SIZE
+                            location.x /
+                                GRID_SIZE.toDouble()
                         ).toInt(),
 
                     z =
                         floor(
-                            location.z / GRID_SIZE
+                            location.z /
+                                GRID_SIZE.toDouble()
                         ).toInt()
                 )
 
             for (
                 dx in -1..1
             ) {
+
                 for (
                     dz in -1..1
                 ) {
@@ -262,9 +303,12 @@ class SettlementObservationCollector(
                     val cell =
                         GridCell(
                             x =
-                                baseCell.x + dx,
+                                baseCell.x +
+                                    dx,
+
                             z =
-                                baseCell.z + dz
+                                baseCell.z +
+                                    dz
                         )
 
                     val nearby =
@@ -272,17 +316,21 @@ class SettlementObservationCollector(
                             ?: continue
 
                     for (
-                        otherIndex in nearby
+                        otherIndex in
+                        nearby
                     ) {
 
                         if (
-                            otherIndex >= index
+                            otherIndex >=
+                            index
                         ) {
                             continue
                         }
 
                         val other =
-                            villagers[otherIndex]
+                            villagers[
+                                otherIndex
+                            ]
 
                         val distance =
                             distanceSquared(
@@ -299,6 +347,7 @@ class SettlementObservationCollector(
                             MAX_CLUSTER_DISTANCE *
                             MAX_CLUSTER_DISTANCE
                         ) {
+
                             union(
                                 index,
                                 otherIndex
@@ -310,7 +359,10 @@ class SettlementObservationCollector(
         }
 
         val clusters =
-            HashMap<Int, MutableList<Villager>>()
+            HashMap<
+                Int,
+                MutableList<Villager>
+            >()
 
         villagers.forEachIndexed {
             index,
@@ -329,52 +381,84 @@ class SettlementObservationCollector(
         return clusters.values.toList()
     }
 
-
     private fun mergeNearbyClusters(
-        clusters: List<List<Villager>>
+        clusters:
+            List<List<Villager>>
     ): List<List<Villager>> {
 
-        if (clusters.size <= 1) {
+        if (
+            clusters.size <= 1
+        ) {
             return clusters
         }
 
         val working =
             clusters
-                .map { it.toMutableList() }
+                .map {
+                    it.toMutableList()
+                }
                 .toMutableList()
 
         var merged = true
 
         while (merged) {
+
             merged = false
 
-            outer@ for (firstIndex in working.indices) {
-                val first = working[firstIndex]
-                val firstCenter =
-                    clusterCenter(first)
+            outer@ for (
+                firstIndex in
+                working.indices
+            ) {
 
-                for (secondIndex in firstIndex + 1 until working.size) {
+                val first =
+                    working[
+                        firstIndex
+                    ]
+
+                val firstCenter =
+                    clusterCenter(
+                        first
+                    )
+
+                for (
+                    secondIndex in
+                    firstIndex + 1 until
+                    working.size
+                ) {
+
                     val second =
-                        working[secondIndex]
+                        working[
+                            secondIndex
+                        ]
 
                     val secondCenter =
-                        clusterCenter(second)
+                        clusterCenter(
+                            second
+                        )
 
                     if (
                         distanceSquared(
-                            firstCenter.x,
-                            firstCenter.y,
-                            firstCenter.z,
-                            secondCenter.x,
-                            secondCenter.y,
-                            secondCenter.z
+                            firstCenter.blockX,
+                            firstCenter.blockY,
+                            firstCenter.blockZ,
+                            secondCenter.blockX,
+                            secondCenter.blockY,
+                            secondCenter.blockZ
                         ) <=
                         MAX_CLUSTER_DISTANCE *
                         MAX_CLUSTER_DISTANCE
                     ) {
-                        first.addAll(second)
-                        working.removeAt(secondIndex)
+
+                        first.addAll(
+                            second
+                        )
+
+                        working.removeAt(
+                            secondIndex
+                        )
+
                         merged = true
+
                         break@outer
                     }
                 }
@@ -387,20 +471,38 @@ class SettlementObservationCollector(
     private fun clusterCenter(
         villagers: List<Villager>
     ): Location {
+
         val first =
-            villagers.first().location
+            villagers
+                .first()
+                .location
+
+        val centerX =
+            villagers
+                .map {
+                    it.location.x
+                }
+                .average()
+
+        val centerY =
+            villagers
+                .map {
+                    it.location.y
+                }
+                .average()
+
+        val centerZ =
+            villagers
+                .map {
+                    it.location.z
+                }
+                .average()
 
         return Location(
             first.world,
-            villagers
-                .map { it.location.x }
-                .average(),
-            villagers
-                .map { it.location.y }
-                .average(),
-            villagers
-                .map { it.location.z }
-                .average()
+            centerX,
+            centerY,
+            centerZ
         )
     }
 
@@ -431,12 +533,17 @@ class SettlementObservationCollector(
 
         return buildString {
 
-            append("settlement_")
+            append(
+                "settlement_"
+            )
+
             append(
                 worldName
                     .lowercase()
                     .replace(
-                        Regex("[^a-z0-9_-]"),
+                        Regex(
+                            "[^a-z0-9_-]"
+                        ),
                         "_"
                     )
             )
@@ -463,8 +570,13 @@ class SettlementObservationCollector(
         centerZ: Int
     ): String {
 
-        return "Settlement ${worldName} " +
-            "(${centerX}, ${centerZ})"
+        return "Settlement " +
+            worldName +
+            " (" +
+            centerX +
+            ", " +
+            centerZ +
+            ")"
     }
 
     private fun distanceSquared(
