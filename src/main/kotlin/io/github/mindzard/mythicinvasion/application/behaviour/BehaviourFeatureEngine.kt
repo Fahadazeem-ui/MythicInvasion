@@ -4,10 +4,11 @@ import io.github.mindzard.mythicinvasion.domain.behaviour.BehaviourFeatures
 import io.github.mindzard.mythicinvasion.domain.behaviour.PlayerBehaviourProfile
 
 /**
- * Converts raw behaviour counters into normalized behavioural signals.
+ * Converts time-weighted behaviour observations into normalized
+ * behavioural signals.
  *
- * This engine is intentionally deterministic and side-effect free.
- * It does not use Bukkit API, network requests, databases, or AI.
+ * This is still a deterministic heuristic engine.
+ * It is not machine learning and does not contact any AI provider.
  */
 class BehaviourFeatureEngine {
 
@@ -15,50 +16,57 @@ class BehaviourFeatureEngine {
         profile: PlayerBehaviourProfile
     ): BehaviourFeatures {
 
-        val totalEvents =
-            profile.totalEvents.toDouble().coerceAtLeast(1.0)
-
-        val actionEvents =
+        val weightedActionTotal =
             (
-                profile.blocksBroken +
-                    profile.blocksPlaced +
-                    profile.combatActions
-                ).toDouble()
-                .coerceAtLeast(1.0)
+                profile.weightedBlocksBroken +
+                    profile.weightedBlocksPlaced +
+                    profile.weightedCombatActions
+                )
+                .coerceAtLeast(0.000001)
 
         val miningScore =
             normalize(
-                profile.blocksBroken.toDouble() / actionEvents
+                profile.weightedBlocksBroken /
+                    weightedActionTotal
             )
 
         val buildingScore =
             normalize(
-                profile.blocksPlaced.toDouble() / actionEvents
+                profile.weightedBlocksPlaced /
+                    weightedActionTotal
             )
 
         val combatScore =
             normalize(
-                profile.combatActions.toDouble() / actionEvents
-            )
-
-        val movementScore =
-            normalize(
-                profile.movements.toDouble() / totalEvents
+                profile.weightedCombatActions /
+                    weightedActionTotal
             )
 
         /*
-         * Activity is deliberately based on total observations rather
-         * than a behaviour category.
+         * Movement is independent from the action distribution.
          *
-         * 5,000 observed events represents a highly active profile
-         * for this first-generation heuristic model.
-         *
-         * This threshold will later become configurable and eventually
-         * time-window based.
+         * A player who is moving consistently has a higher movement
+         * signal, while old movement naturally decays over time.
+         */
+        val movementScore =
+            normalize(
+                profile.weightedMovements /
+                    20.0
+            )
+
+        /*
+         * Overall activity represents how much recent meaningful
+         * behaviour remains in the weighted model.
          */
         val activityScore =
             normalize(
-                profile.totalEvents.toDouble() / 5_000.0
+                (
+                    profile.weightedMovements +
+                        profile.weightedBlocksBroken +
+                        profile.weightedBlocksPlaced +
+                        profile.weightedCombatActions
+                    ) /
+                    100.0
             )
 
         return BehaviourFeatures(
@@ -70,8 +78,13 @@ class BehaviourFeatureEngine {
         )
     }
 
-    private fun normalize(value: Double): Double {
-        return value
-            .coerceIn(0.0, 1.0)
+    private fun normalize(
+        value: Double
+    ): Double {
+
+        return value.coerceIn(
+            0.0,
+            1.0
+        )
     }
 }
