@@ -3,6 +3,9 @@ package io.github.mindzard.mythicinvasion.bootstrap
 import io.github.mindzard.mythicinvasion.application.ai.AiContextAssembler
 import io.github.mindzard.mythicinvasion.application.ai.AiDecisionValidator
 import io.github.mindzard.mythicinvasion.application.ai.AiStrategyCoordinator
+import io.github.mindzard.mythicinvasion.application.ai.StrategyActionParser
+import io.github.mindzard.mythicinvasion.application.ai.StrategyCooldownStore
+import io.github.mindzard.mythicinvasion.application.ai.StrategyExecutionState
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourEventBuffer
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourFeatureEngine
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourProcessor
@@ -18,6 +21,7 @@ import io.github.mindzard.mythicinvasion.application.society.SettlementSocialCoo
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialEngine
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialStore
 import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
+import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipCollector
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipStore
 import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyCoordinator
@@ -134,6 +138,15 @@ class ServiceRegistry {
         private set
 
     lateinit var geminiStrategyClient: GeminiStrategyClient
+        private set
+
+    lateinit var strategyExecutionState: StrategyExecutionState
+        private set
+
+    lateinit var strategyActionParser: StrategyActionParser
+        private set
+
+    lateinit var strategyCooldownStore: StrategyCooldownStore
         private set
 
     lateinit var aiStrategyCoordinator: AiStrategyCoordinator
@@ -335,6 +348,24 @@ class ServiceRegistry {
         client: GeminiStrategyClient
     ) {
         geminiStrategyClient = client
+    }
+
+    fun registerStrategyExecutionState(
+        state: StrategyExecutionState
+    ) {
+        strategyExecutionState = state
+    }
+
+    fun registerStrategyActionParser(
+        parser: StrategyActionParser
+    ) {
+        strategyActionParser = parser
+    }
+
+    fun registerStrategyCooldownStore(
+        store: StrategyCooldownStore
+    ) {
+        strategyCooldownStore = store
     }
 
     fun registerAiStrategyCoordinator(
