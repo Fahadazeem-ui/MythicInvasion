@@ -1,6 +1,7 @@
 package io.github.mindzard.mythicinvasion.bootstrap
 
 import io.github.mindzard.mythicinvasion.MythicInvasionPlugin
+import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourDecayEngine
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourEventBuffer
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourFeatureEngine
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourProcessor
@@ -18,10 +19,13 @@ class PluginBootstrap(
 
     fun start(): ServiceRegistry {
 
-        val registry = ServiceRegistry()
+        val registry =
+            ServiceRegistry()
 
         val configurationManager =
-            ConfigurationManager(plugin)
+            ConfigurationManager(
+                plugin
+            )
 
         configurationManager.load()
 
@@ -30,21 +34,27 @@ class PluginBootstrap(
         )
 
         val coroutineEngine =
-            CoroutineEngine(plugin)
+            CoroutineEngine(
+                plugin
+            )
 
         registry.registerCoroutineEngine(
             coroutineEngine
         )
 
         val playerSnapshotCollector =
-            PlayerSnapshotCollector(plugin)
+            PlayerSnapshotCollector(
+                plugin
+            )
 
         registry.registerPlayerSnapshotCollector(
             playerSnapshotCollector
         )
 
         val ecosystemEngine =
-            EcosystemEngine(plugin)
+            EcosystemEngine(
+                plugin
+            )
 
         registry.registerEcosystemEngine(
             ecosystemEngine
@@ -78,8 +88,17 @@ class PluginBootstrap(
             behaviourEventBuffer
         )
 
+        val decayEngine =
+            BehaviourDecayEngine(
+                halfLifeMillis =
+                    configurationManager
+                        .behaviourDecayHalfLifeMillis()
+            )
+
         val behaviourProfileStore =
-            BehaviourProfileStore()
+            BehaviourProfileStore(
+                decayEngine
+            )
 
         registry.registerBehaviourProfileStore(
             behaviourProfileStore
@@ -98,7 +117,11 @@ class PluginBootstrap(
                 coroutineEngine = coroutineEngine,
                 buffer = behaviourEventBuffer,
                 profileStore = behaviourProfileStore,
-                featureEngine = behaviourFeatureEngine
+                featureEngine = behaviourFeatureEngine,
+                processingIntervalMillis = {
+                    configurationManager
+                        .behaviourProcessingIntervalMillis()
+                }
             )
 
         registry.registerBehaviourProcessor(
@@ -106,7 +129,7 @@ class PluginBootstrap(
         )
 
         /*
-         * Register Bukkit/Paper event listeners.
+         * Register Minecraft event listeners.
          */
         plugin.server.pluginManager.registerEvents(
             PlayerBehaviourListener(
@@ -116,10 +139,23 @@ class PluginBootstrap(
         )
 
         /*
-         * Start background processing.
+         * Start background processors.
          */
-        behaviourProcessor.start()
-        ecosystemCoordinator.start()
+        if (
+            configurationManager
+                .isBehaviourEnabled()
+        ) {
+
+            behaviourProcessor.start()
+        }
+
+        if (
+            configurationManager
+                .isEcosystemEnabled()
+        ) {
+
+            ecosystemCoordinator.start()
+        }
 
         plugin.logger.info(
             "Configuration system initialized."
@@ -142,6 +178,10 @@ class PluginBootstrap(
         )
 
         plugin.logger.info(
+            "Behaviour decay engine initialized."
+        )
+
+        plugin.logger.info(
             "Behaviour profile store initialized."
         )
 
@@ -150,7 +190,7 @@ class PluginBootstrap(
         )
 
         plugin.logger.info(
-            "Behaviour processor started."
+            "Behaviour processor initialized."
         )
 
         plugin.logger.info(
