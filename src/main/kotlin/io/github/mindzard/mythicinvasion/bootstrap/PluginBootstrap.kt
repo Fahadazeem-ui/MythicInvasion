@@ -638,6 +638,10 @@ class PluginBootstrap(
                     pillagerStrategyStore,
                 targetingEngine =
                     pillagerTargetingEngine,
+                strategyExecutionState =
+                    strategyExecutionState,
+                strategyActionParser =
+                    strategyActionParser,
                 updateIntervalMillis = {
                     configurationManager
                         .pillagerFactionStrategyIntervalMillis()
