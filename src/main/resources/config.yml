@@ -22,6 +22,15 @@ behaviour:
   decay:
     half-life-minutes: 30
 
+adaptive-behaviour:
+  enabled: true
+
+  hostile-targeting:
+    enabled: true
+    range: 32.0
+    minimum-advantage: 0.12
+    cooldown-millis: 5000
+
 ai:
   enabled: true
   provider: gemini
