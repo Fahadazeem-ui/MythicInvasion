@@ -44,6 +44,7 @@ import io.github.mindzard.mythicinvasion.infrastructure.paper.ai.HostileMobStrat
 import io.github.mindzard.mythicinvasion.infrastructure.paper.command.SocietyDebugCommand
 import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.PlayerSnapshotCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.player.PlayerBehaviourListener
+import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.AnimalBehaviourListener
 import io.github.mindzard.mythicinvasion.infrastructure.paper.society.SettlementObservationCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.society.VillagerObservationCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.society.VillagerRelationshipCollector
