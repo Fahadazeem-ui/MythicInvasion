@@ -39,6 +39,22 @@ class ConfigurationManager(
             .coerceAtLeast(1L)
     }
 
+    fun isWorldIntelligenceEnabled(): Boolean {
+        return configuration.getBoolean(
+            "world-intelligence.enabled",
+            true
+        )
+    }
+
+    fun worldIntelligenceUpdateIntervalMillis(): Long {
+        return configuration
+            .getLong(
+                "world-intelligence.update-interval-millis",
+                5_000L
+            )
+            .coerceAtLeast(1_000L)
+    }
+
     fun isBehaviourEnabled(): Boolean {
         return configuration.getBoolean(
             "behaviour.enabled",
