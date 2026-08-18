@@ -3,9 +3,9 @@ package io.github.mindzard.mythicinvasion.application.intelligence
 import io.github.mindzard.mythicinvasion.domain.behaviour.BehaviourFeatures
 import io.github.mindzard.mythicinvasion.domain.behaviour.PlayerBehaviourProfile
 import io.github.mindzard.mythicinvasion.domain.intelligence.BehaviourArchetype
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
 import java.util.UUID
 
 class BehaviourIntelligenceEngineTest {
