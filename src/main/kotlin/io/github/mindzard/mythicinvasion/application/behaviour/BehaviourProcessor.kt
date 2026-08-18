@@ -12,36 +12,78 @@ class BehaviourProcessor(
     private val coroutineEngine: CoroutineEngine,
     private val buffer: BehaviourEventBuffer,
     private val profileStore: BehaviourProfileStore,
-    private val featureEngine: BehaviourFeatureEngine
+    private val featureEngine: BehaviourFeatureEngine,
+    private val processingIntervalMillis: () -> Long
 ) {
 
     private var processingJob: Job? = null
 
     fun start() {
+
         if (processingJob != null) {
             return
         }
 
-        processingJob = coroutineEngine.scope.launch {
+        processingJob =
+            coroutineEngine.scope.launch {
 
-            while (isActive) {
+                while (isActive) {
 
-                val events = buffer.drain(
-                    maxEvents = 1_000
-                )
+                    val nowMillis =
+                        System.currentTimeMillis()
 
-                if (events.isNotEmpty()) {
-                    processBatch(events)
+                    /*
+                     * Apply time decay even when a player has generated
+                     * no new events.
+                     */
+                    profileStore.applyTimeDecay(
+                        nowMillis
+                    )
 
-                    plugin.logger.fine(
-                        "Processed ${events.size} behaviour events. " +
-                            "Buffered=${buffer.size()}"
+                    val events =
+                        buffer.drain(
+                            maxEvents = 1_000
+                        )
+
+                    if (events.isNotEmpty()) {
+
+                        processBatch(
+                            events
+                        )
+                    }
+
+                    /*
+                     * Recalculate every existing profile after decay.
+                     *
+                     * This ensures AI-facing features also reflect the
+                     * latest decayed state.
+                     */
+                    profileStore.recalculateAllFeatures(
+                        featureEngine
+                    )
+
+                    if (
+                        plugin.logger.isLoggable(
+                            java.util.logging.Level.FINE
+                        )
+                    ) {
+
+                        plugin.logger.fine(
+                            "Behaviour cycle completed. " +
+                                "processedEvents=" +
+                                events.size +
+                                ", profiles=" +
+                                profileStore.snapshot().size +
+                                ", buffered=" +
+                                buffer.size()
+                        )
+                    }
+
+                    delay(
+                        processingIntervalMillis()
                     )
                 }
-
-                delay(1_000L)
             }
-        }
     }
 
     fun stop() {
@@ -50,48 +92,40 @@ class BehaviourProcessor(
         processingJob = null
 
         /*
-         * Drain pending events before shutdown.
+         * Process any remaining events before shutdown.
          */
-        val remainingEvents = buffer.drain(
-            maxEvents = 100_000
-        )
+        val remainingEvents =
+            buffer.drain(
+                maxEvents = 100_000
+            )
 
         if (remainingEvents.isNotEmpty()) {
+
             processBatch(
                 remainingEvents
             )
-
-            plugin.logger.fine(
-                "Processed ${remainingEvents.size} pending " +
-                    "behaviour events during shutdown."
-            )
         }
+
+        profileStore.applyTimeDecay(
+            System.currentTimeMillis()
+        )
+
+        profileStore.recalculateAllFeatures(
+            featureEngine
+        )
     }
 
     private fun processBatch(
-        events: List<io.github.mindzard.mythicinvasion.domain.behaviour.BehaviourEvent>
+        events: List<
+            io.github.mindzard.mythicinvasion.domain.behaviour.BehaviourEvent
+            >
     ) {
 
         for (event in events) {
-            profileStore.apply(event)
+
+            profileStore.apply(
+                event
+            )
         }
-
-        /*
-         * Only recalculate profiles that were actually affected by
-         * the current batch.
-         *
-         * Distinct UUIDs prevent unnecessary duplicate calculations.
-         */
-        events
-            .asSequence()
-            .map { it.playerId }
-            .distinct()
-            .forEach { playerId ->
-
-                profileStore.recalculateFeatures(
-                    playerId = playerId,
-                    featureEngine = featureEngine
-                )
-            }
     }
 }
