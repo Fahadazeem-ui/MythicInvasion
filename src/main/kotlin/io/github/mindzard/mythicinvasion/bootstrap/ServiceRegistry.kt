@@ -12,6 +12,9 @@ import io.github.mindzard.mythicinvasion.application.society.FactionRelationServ
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationCoordinator
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationEngine
 import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
+import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyCoordinator
+import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyEngine
+import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyStore
 import io.github.mindzard.mythicinvasion.application.world.WorldIntelligenceCoordinator
 import io.github.mindzard.mythicinvasion.application.world.WorldIntelligenceEngine
 import io.github.mindzard.mythicinvasion.application.world.WorldStateStore
@@ -19,6 +22,7 @@ import io.github.mindzard.mythicinvasion.concurrency.CoroutineEngine
 import io.github.mindzard.mythicinvasion.config.ConfigurationManager
 import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.PlayerSnapshotCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.society.SettlementObservationCollector
+import io.github.mindzard.mythicinvasion.infrastructure.paper.society.VillagerObservationCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.world.WorldSnapshotCollector
 
 class ServiceRegistry {
@@ -81,6 +85,18 @@ class ServiceRegistry {
         private set
 
     lateinit var settlementObservationCoordinator: SettlementObservationCoordinator
+        private set
+
+    lateinit var villagerObservationCollector: VillagerObservationCollector
+        private set
+
+    lateinit var villagerSocietyEngine: VillagerSocietyEngine
+        private set
+
+    lateinit var villagerSocietyStore: VillagerSocietyStore
+        private set
+
+    lateinit var villagerSocietyCoordinator: VillagerSocietyCoordinator
         private set
 
     fun registerConfigurationManager(
@@ -201,5 +217,29 @@ class ServiceRegistry {
         coordinator: SettlementObservationCoordinator
     ) {
         settlementObservationCoordinator = coordinator
+    }
+
+    fun registerVillagerObservationCollector(
+        collector: VillagerObservationCollector
+    ) {
+        villagerObservationCollector = collector
+    }
+
+    fun registerVillagerSocietyEngine(
+        engine: VillagerSocietyEngine
+    ) {
+        villagerSocietyEngine = engine
+    }
+
+    fun registerVillagerSocietyStore(
+        store: VillagerSocietyStore
+    ) {
+        villagerSocietyStore = store
+    }
+
+    fun registerVillagerSocietyCoordinator(
+        coordinator: VillagerSocietyCoordinator
+    ) {
+        villagerSocietyCoordinator = coordinator
     }
 }
