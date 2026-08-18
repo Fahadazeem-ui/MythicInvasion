@@ -68,6 +68,12 @@ class MythicInvasionPlugin : JavaPlugin() {
                     "Behaviour processor stopped."
                 )
 
+                services.villagerSocietyCoordinator.stop()
+
+                logger.info(
+                    "Villager society coordinator stopped."
+                )
+
                 services.settlementObservationCoordinator.stop()
 
                 logger.info(
@@ -101,6 +107,8 @@ class MythicInvasionPlugin : JavaPlugin() {
                 services.worldStateStore.reset()
 
                 services.societyStateStore.reset()
+
+                services.villagerSocietyStore.clear()
 
                 logger.info(
                     "All in-memory intelligence state cleared."
