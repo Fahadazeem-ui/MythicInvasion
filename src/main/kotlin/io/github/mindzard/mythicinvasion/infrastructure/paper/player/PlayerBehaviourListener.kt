@@ -22,7 +22,9 @@ class PlayerBehaviourListener(
         priority = EventPriority.MONITOR,
         ignoreCancelled = true
     )
-    fun onPlayerJoin(event: PlayerJoinEvent) {
+    fun onPlayerJoin(
+        event: PlayerJoinEvent
+    ) {
         record(
             player = event.player,
             action = BehaviourAction.JOIN,
@@ -34,7 +36,9 @@ class PlayerBehaviourListener(
         priority = EventPriority.MONITOR,
         ignoreCancelled = true
     )
-    fun onPlayerQuit(event: PlayerQuitEvent) {
+    fun onPlayerQuit(
+        event: PlayerQuitEvent
+    ) {
         record(
             player = event.player,
             action = BehaviourAction.QUIT,
@@ -46,11 +50,14 @@ class PlayerBehaviourListener(
         priority = EventPriority.MONITOR,
         ignoreCancelled = true
     )
-    fun onBlockBreak(event: BlockBreakEvent) {
+    fun onBlockBreak(
+        event: BlockBreakEvent
+    ) {
         record(
             player = event.player,
             action = BehaviourAction.BLOCK_BREAK,
-            target = event.block.type.key.toString()
+            target =
+                event.block.type.key.toString()
         )
     }
 
@@ -58,11 +65,14 @@ class PlayerBehaviourListener(
         priority = EventPriority.MONITOR,
         ignoreCancelled = true
     )
-    fun onBlockPlace(event: BlockPlaceEvent) {
+    fun onBlockPlace(
+        event: BlockPlaceEvent
+    ) {
         record(
             player = event.player,
             action = BehaviourAction.BLOCK_PLACE,
-            target = event.blockPlaced.type.key.toString()
+            target =
+                event.blockPlaced.type.key.toString()
         )
     }
 
@@ -70,15 +80,19 @@ class PlayerBehaviourListener(
         priority = EventPriority.MONITOR,
         ignoreCancelled = true
     )
-    fun onEntityDamage(event: EntityDamageByEntityEvent) {
+    fun onEntityDamage(
+        event: EntityDamageByEntityEvent
+    ) {
 
-        val player = event.damager as? Player
-            ?: return
+        val player =
+            event.damager as? Player
+                ?: return
 
         record(
             player = player,
             action = BehaviourAction.COMBAT,
-            target = event.entity.type.key.toString()
+            target =
+                event.entity.type.key.toString()
         )
     }
 
@@ -86,16 +100,16 @@ class PlayerBehaviourListener(
         priority = EventPriority.MONITOR,
         ignoreCancelled = true
     )
-    fun onPlayerMove(event: PlayerMoveEvent) {
+    fun onPlayerMove(
+        event: PlayerMoveEvent
+    ) {
 
-        val from = event.from
-        val to = event.to ?: return
+        val from =
+            event.from
 
-        /*
-         * Ignore pure camera movement.
-         *
-         * A PlayerMoveEvent can fire extremely frequently.
-         */
+        val to =
+            event.to
+
         if (
             from.blockX == to.blockX &&
             from.blockY == to.blockY &&
@@ -117,19 +131,41 @@ class PlayerBehaviourListener(
         action: BehaviourAction,
         target: String?
     ) {
-        val location = player.location
+
+        val location =
+            player.location
+
+        val world =
+            location.world
 
         buffer.add(
             BehaviourEvent(
-                playerId = player.uniqueId,
-                playerName = player.name,
-                action = action,
-                worldName = location.world.name,
-                x = location.blockX,
-                y = location.blockY,
-                z = location.blockZ,
-                target = target,
-                timestampMillis = System.currentTimeMillis()
+                playerId =
+                    player.uniqueId,
+
+                playerName =
+                    player.name,
+
+                action =
+                    action,
+
+                worldName =
+                    world.name,
+
+                x =
+                    location.blockX,
+
+                y =
+                    location.blockY,
+
+                z =
+                    location.blockZ,
+
+                target =
+                    target,
+
+                timestampMillis =
+                    System.currentTimeMillis()
             )
         )
     }
