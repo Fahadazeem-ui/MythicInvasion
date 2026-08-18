@@ -5,9 +5,12 @@ ecosystem:
   enabled: true
   update-interval-ticks: 20
 
+world-intelligence:
+  enabled: true
+  update-interval-millis: 5000
+
 behaviour:
   enabled: true
-
   processing-interval-millis: 1000
 
   decay:
