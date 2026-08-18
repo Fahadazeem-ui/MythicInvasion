@@ -13,6 +13,7 @@ society:
   enabled: true
   observation-interval-millis: 10000
   villager-analysis-interval-millis: 10000
+  social-interval-millis: 10000
 
 behaviour:
   enabled: true
