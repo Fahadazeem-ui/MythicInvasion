@@ -27,6 +27,7 @@ import io.github.mindzard.mythicinvasion.application.society.SettlementSocialCoo
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialEngine
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialStore
 import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
+import io.github.mindzard.mythicinvasion.application.society.VillagerCitizenCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipEngine
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipStore
@@ -363,6 +364,43 @@ class PluginBootstrap(
             villagerRelationshipCoordinator
         )
 
+        /*
+         * =========================================================
+         * VILLAGER CITIZEN BEHAVIOUR
+         * =========================================================
+         */
+
+        val villagerCitizenCoordinator =
+            VillagerCitizenCoordinator(
+                plugin =
+                    plugin,
+                coroutineEngine =
+                    coroutineEngine,
+                stateStore =
+                    societyStateStore,
+                relationshipStore =
+                    villagerRelationshipStore,
+                updateIntervalMillis = {
+                    5_000L
+                },
+                interactionRadius =
+                    12.0,
+                hostileRadius =
+                    10.0,
+                friendlyLookRadius =
+                    10.0,
+                hostileThreatThreshold =
+                    0.65,
+                friendlyTrustThreshold =
+                    0.60,
+                actionCooldownMillis =
+                    5_000L
+            )
+
+        registry.registerVillagerCitizenCoordinator(
+            villagerCitizenCoordinator
+        )
+
         val settlementSocialEngine =
             SettlementSocialEngine()
 
@@ -638,6 +676,8 @@ class PluginBootstrap(
             villagerSocietyCoordinator.start()
 
             villagerRelationshipCoordinator.start()
+
+            villagerCitizenCoordinator.start()
 
             settlementSocialCoordinator.start()
         }
