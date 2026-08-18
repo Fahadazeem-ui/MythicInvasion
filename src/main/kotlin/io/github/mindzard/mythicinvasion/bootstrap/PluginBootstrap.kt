@@ -39,10 +39,13 @@ class PluginBootstrap(
 
     fun start(): ServiceRegistry {
 
-        val registry = ServiceRegistry()
+        val registry =
+            ServiceRegistry()
 
         val configurationManager =
-            ConfigurationManager(plugin)
+            ConfigurationManager(
+                plugin
+            )
 
         configurationManager.load()
 
@@ -51,21 +54,33 @@ class PluginBootstrap(
         )
 
         val coroutineEngine =
-            CoroutineEngine(plugin)
+            CoroutineEngine(
+                plugin
+            )
 
         registry.registerCoroutineEngine(
             coroutineEngine
         )
 
+        /*
+         * =========================================================
+         * ECOSYSTEM SUBSYSTEM
+         * =========================================================
+         */
+
         val playerSnapshotCollector =
-            PlayerSnapshotCollector(plugin)
+            PlayerSnapshotCollector(
+                plugin
+            )
 
         registry.registerPlayerSnapshotCollector(
             playerSnapshotCollector
         )
 
         val ecosystemEngine =
-            EcosystemEngine(plugin)
+            EcosystemEngine(
+                plugin
+            )
 
         registry.registerEcosystemEngine(
             ecosystemEngine
@@ -77,7 +92,7 @@ class PluginBootstrap(
                 coroutineEngine = coroutineEngine,
                 snapshotCollector = playerSnapshotCollector,
                 ecosystemEngine = ecosystemEngine,
-                updateIntervalMillis = {
+                updateIntervalMillisProvider = {
                     configurationManager
                         .ecosystemUpdateIntervalTicks()
                         .times(50L)
@@ -87,6 +102,12 @@ class PluginBootstrap(
         registry.registerEcosystemCoordinator(
             ecosystemCoordinator
         )
+
+        /*
+         * =========================================================
+         * PLAYER BEHAVIOUR SUBSYSTEM
+         * =========================================================
+         */
 
         val behaviourEventBuffer =
             BehaviourEventBuffer()
@@ -152,8 +173,16 @@ class PluginBootstrap(
             behaviourProcessor
         )
 
+        /*
+         * =========================================================
+         * WORLD INTELLIGENCE SUBSYSTEM
+         * =========================================================
+         */
+
         val worldSnapshotCollector =
-            WorldSnapshotCollector(plugin)
+            WorldSnapshotCollector(
+                plugin
+            )
 
         registry.registerWorldSnapshotCollector(
             worldSnapshotCollector
@@ -190,8 +219,16 @@ class PluginBootstrap(
             worldIntelligenceCoordinator
         )
 
+        /*
+         * =========================================================
+         * SETTLEMENT SUBSYSTEM
+         * =========================================================
+         */
+
         val settlementObservationCollector =
-            SettlementObservationCollector(plugin)
+            SettlementObservationCollector(
+                plugin
+            )
 
         registry.registerSettlementObservationCollector(
             settlementObservationCollector
@@ -235,8 +272,16 @@ class PluginBootstrap(
             settlementObservationCoordinator
         )
 
+        /*
+         * =========================================================
+         * VILLAGER SOCIETY SUBSYSTEM
+         * =========================================================
+         */
+
         val villagerObservationCollector =
-            VillagerObservationCollector(plugin)
+            VillagerObservationCollector(
+                plugin
+            )
 
         registry.registerVillagerObservationCollector(
             villagerObservationCollector
@@ -275,8 +320,11 @@ class PluginBootstrap(
         )
 
         /*
-         * Player-villager relationship intelligence.
+         * =========================================================
+         * VILLAGER ↔ PLAYER RELATIONSHIP SUBSYSTEM
+         * =========================================================
          */
+
         val villagerRelationshipEngine =
             VillagerRelationshipEngine()
 
@@ -314,6 +362,12 @@ class PluginBootstrap(
             villagerRelationshipCoordinator
         )
 
+        /*
+         * =========================================================
+         * MINECRAFT EVENT LISTENERS
+         * =========================================================
+         */
+
         plugin.server.pluginManager.registerEvents(
             PlayerBehaviourListener(
                 buffer = behaviourEventBuffer
@@ -321,33 +375,50 @@ class PluginBootstrap(
             plugin
         )
 
-        plugin.getCommand("society")
-            ?.setExecutor(
-                SocietyDebugCommand(
-                    societyStateStore
-                )
+        /*
+         * =========================================================
+         * DEBUG COMMANDS
+         * =========================================================
+         */
+
+        plugin.getCommand(
+            "society"
+        )?.setExecutor(
+            SocietyDebugCommand(
+                societyStateStore
             )
+        )
+
+        /*
+         * =========================================================
+         * START ENABLED SUBSYSTEMS
+         * =========================================================
+         */
 
         if (
-            configurationManager.isBehaviourEnabled()
+            configurationManager
+                .isBehaviourEnabled()
         ) {
             behaviourProcessor.start()
         }
 
         if (
-            configurationManager.isEcosystemEnabled()
+            configurationManager
+                .isEcosystemEnabled()
         ) {
             ecosystemCoordinator.start()
         }
 
         if (
-            configurationManager.isWorldIntelligenceEnabled()
+            configurationManager
+                .isWorldIntelligenceEnabled()
         ) {
             worldIntelligenceCoordinator.start()
         }
 
         if (
-            configurationManager.isSocietyEnabled()
+            configurationManager
+                .isSocietyEnabled()
         ) {
             settlementObservationCoordinator.start()
             villagerSocietyCoordinator.start()
