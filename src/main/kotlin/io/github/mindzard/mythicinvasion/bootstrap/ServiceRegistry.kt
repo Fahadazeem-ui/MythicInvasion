@@ -1,5 +1,7 @@
 package io.github.mindzard.mythicinvasion.bootstrap
 
+import io.github.mindzard.mythicinvasion.application.ai.AiContextAssembler
+import io.github.mindzard.mythicinvasion.application.ai.AiStrategyCoordinator
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourEventBuffer
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourFeatureEngine
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourProcessor
@@ -25,6 +27,7 @@ import io.github.mindzard.mythicinvasion.application.world.WorldIntelligenceEngi
 import io.github.mindzard.mythicinvasion.application.world.WorldStateStore
 import io.github.mindzard.mythicinvasion.concurrency.CoroutineEngine
 import io.github.mindzard.mythicinvasion.config.ConfigurationManager
+import io.github.mindzard.mythicinvasion.infrastructure.ai.GeminiStrategyClient
 import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.PlayerSnapshotCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.society.SettlementObservationCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.society.VillagerObservationCollector
@@ -33,11 +36,23 @@ import io.github.mindzard.mythicinvasion.infrastructure.paper.world.WorldSnapsho
 
 class ServiceRegistry {
 
+    /*
+     * ============================================================
+     * CORE
+     * ============================================================
+     */
+
     lateinit var configurationManager: ConfigurationManager
         private set
 
     lateinit var coroutineEngine: CoroutineEngine
         private set
+
+    /*
+     * ============================================================
+     * ECOSYSTEM
+     * ============================================================
+     */
 
     lateinit var playerSnapshotCollector: PlayerSnapshotCollector
         private set
@@ -47,6 +62,12 @@ class ServiceRegistry {
 
     lateinit var ecosystemCoordinator: EcosystemCoordinator
         private set
+
+    /*
+     * ============================================================
+     * PLAYER BEHAVIOUR
+     * ============================================================
+     */
 
     lateinit var behaviourEventBuffer: BehaviourEventBuffer
         private set
@@ -66,6 +87,12 @@ class ServiceRegistry {
     lateinit var behaviourIntelligenceStore: BehaviourIntelligenceStore
         private set
 
+    /*
+     * ============================================================
+     * WORLD INTELLIGENCE
+     * ============================================================
+     */
+
     lateinit var worldSnapshotCollector: WorldSnapshotCollector
         private set
 
@@ -77,6 +104,12 @@ class ServiceRegistry {
 
     lateinit var worldIntelligenceCoordinator: WorldIntelligenceCoordinator
         private set
+
+    /*
+     * ============================================================
+     * SETTLEMENT / SOCIETY
+     * ============================================================
+     */
 
     lateinit var settlementObservationCollector: SettlementObservationCollector
         private set
@@ -93,6 +126,12 @@ class ServiceRegistry {
     lateinit var settlementObservationCoordinator: SettlementObservationCoordinator
         private set
 
+    /*
+     * ============================================================
+     * VILLAGER SOCIETY
+     * ============================================================
+     */
+
     lateinit var villagerObservationCollector: VillagerObservationCollector
         private set
 
@@ -105,6 +144,12 @@ class ServiceRegistry {
     lateinit var villagerSocietyCoordinator: VillagerSocietyCoordinator
         private set
 
+    /*
+     * ============================================================
+     * VILLAGER ↔ PLAYER RELATIONSHIPS
+     * ============================================================
+     */
+
     lateinit var villagerRelationshipCollector: VillagerRelationshipCollector
         private set
 
@@ -114,6 +159,12 @@ class ServiceRegistry {
     lateinit var villagerRelationshipCoordinator: VillagerRelationshipCoordinator
         private set
 
+    /*
+     * ============================================================
+     * SETTLEMENT SOCIAL INTELLIGENCE
+     * ============================================================
+     */
+
     lateinit var settlementSocialEngine: SettlementSocialEngine
         private set
 
@@ -122,6 +173,29 @@ class ServiceRegistry {
 
     lateinit var settlementSocialCoordinator: SettlementSocialCoordinator
         private set
+
+    /*
+     * ============================================================
+     * AI STRATEGY LAYER
+     * ============================================================
+     *
+     * These services are only initialized when AI is enabled.
+     */
+
+    lateinit var aiContextAssembler: AiContextAssembler
+        private set
+
+    lateinit var geminiStrategyClient: GeminiStrategyClient
+        private set
+
+    lateinit var aiStrategyCoordinator: AiStrategyCoordinator
+        private set
+
+    /*
+     * ============================================================
+     * REGISTRATION
+     * ============================================================
+     */
 
     fun registerConfigurationManager(
         manager: ConfigurationManager
@@ -134,6 +208,12 @@ class ServiceRegistry {
     ) {
         coroutineEngine = engine
     }
+
+    /*
+     * ============================================================
+     * ECOSYSTEM REGISTRATION
+     * ============================================================
+     */
 
     fun registerPlayerSnapshotCollector(
         collector: PlayerSnapshotCollector
@@ -152,6 +232,12 @@ class ServiceRegistry {
     ) {
         ecosystemCoordinator = coordinator
     }
+
+    /*
+     * ============================================================
+     * BEHAVIOUR REGISTRATION
+     * ============================================================
+     */
 
     fun registerBehaviourEventBuffer(
         buffer: BehaviourEventBuffer
@@ -189,6 +275,12 @@ class ServiceRegistry {
         behaviourIntelligenceStore = store
     }
 
+    /*
+     * ============================================================
+     * WORLD INTELLIGENCE REGISTRATION
+     * ============================================================
+     */
+
     fun registerWorldSnapshotCollector(
         collector: WorldSnapshotCollector
     ) {
@@ -212,6 +304,12 @@ class ServiceRegistry {
     ) {
         worldIntelligenceCoordinator = coordinator
     }
+
+    /*
+     * ============================================================
+     * SETTLEMENT REGISTRATION
+     * ============================================================
+     */
 
     fun registerSettlementObservationCollector(
         collector: SettlementObservationCollector
@@ -243,6 +341,12 @@ class ServiceRegistry {
         settlementObservationCoordinator = coordinator
     }
 
+    /*
+     * ============================================================
+     * VILLAGER SOCIETY REGISTRATION
+     * ============================================================
+     */
+
     fun registerVillagerObservationCollector(
         collector: VillagerObservationCollector
     ) {
@@ -267,6 +371,12 @@ class ServiceRegistry {
         villagerSocietyCoordinator = coordinator
     }
 
+    /*
+     * ============================================================
+     * VILLAGER ↔ PLAYER REGISTRATION
+     * ============================================================
+     */
+
     fun registerVillagerRelationshipCollector(
         collector: VillagerRelationshipCollector
     ) {
@@ -285,6 +395,12 @@ class ServiceRegistry {
         villagerRelationshipCoordinator = coordinator
     }
 
+    /*
+     * ============================================================
+     * SETTLEMENT SOCIAL REGISTRATION
+     * ============================================================
+     */
+
     fun registerSettlementSocialEngine(
         engine: SettlementSocialEngine
     ) {
@@ -301,5 +417,29 @@ class ServiceRegistry {
         coordinator: SettlementSocialCoordinator
     ) {
         settlementSocialCoordinator = coordinator
+    }
+
+    /*
+     * ============================================================
+     * AI REGISTRATION
+     * ============================================================
+     */
+
+    fun registerAiContextAssembler(
+        assembler: AiContextAssembler
+    ) {
+        aiContextAssembler = assembler
+    }
+
+    fun registerGeminiStrategyClient(
+        client: GeminiStrategyClient
+    ) {
+        geminiStrategyClient = client
+    }
+
+    fun registerAiStrategyCoordinator(
+        coordinator: AiStrategyCoordinator
+    ) {
+        aiStrategyCoordinator = coordinator
     }
 }
