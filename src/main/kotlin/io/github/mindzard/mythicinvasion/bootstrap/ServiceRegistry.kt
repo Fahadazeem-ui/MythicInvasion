@@ -16,13 +16,14 @@ import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntel
 import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceStore
 import io.github.mindzard.mythicinvasion.application.society.FactionRelationService
 import io.github.mindzard.mythicinvasion.application.society.PillagerFactionCoordinator
+import io.github.mindzard.mythicinvasion.application.society.PillagerSettlementTargetingEngine
+import io.github.mindzard.mythicinvasion.application.society.PillagerStrategyStore
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationCoordinator
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationEngine
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialCoordinator
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialEngine
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialStore
 import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
-import io.github.mindzard.mythicinvasion.application.society.VillagerCitizenCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipStore
 import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyCoordinator
@@ -123,12 +124,6 @@ class ServiceRegistry {
     lateinit var villagerRelationshipCoordinator: VillagerRelationshipCoordinator
         private set
 
-    lateinit var villagerCitizenCoordinator: VillagerCitizenCoordinator
-        private set
-
-    lateinit var pillagerFactionCoordinator: PillagerFactionCoordinator
-        private set
-
     lateinit var settlementSocialEngine: SettlementSocialEngine
         private set
 
@@ -157,6 +152,15 @@ class ServiceRegistry {
         private set
 
     lateinit var aiStrategyCoordinator: AiStrategyCoordinator
+        private set
+
+    lateinit var pillagerStrategyStore: PillagerStrategyStore
+        private set
+
+    lateinit var pillagerTargetingEngine: PillagerSettlementTargetingEngine
+        private set
+
+    lateinit var pillagerFactionCoordinator: PillagerFactionCoordinator
         private set
 
     fun registerConfigurationManager(
@@ -321,18 +325,6 @@ class ServiceRegistry {
         villagerRelationshipCoordinator = coordinator
     }
 
-    fun registerVillagerCitizenCoordinator(
-        coordinator: VillagerCitizenCoordinator
-    ) {
-        villagerCitizenCoordinator = coordinator
-    }
-
-    fun registerPillagerFactionCoordinator(
-        coordinator: PillagerFactionCoordinator
-    ) {
-        pillagerFactionCoordinator = coordinator
-    }
-
     fun registerSettlementSocialEngine(
         engine: SettlementSocialEngine
     ) {
@@ -391,6 +383,24 @@ class ServiceRegistry {
         coordinator: AiStrategyCoordinator
     ) {
         aiStrategyCoordinator = coordinator
+    }
+
+    fun registerPillagerStrategyStore(
+        store: PillagerStrategyStore
+    ) {
+        pillagerStrategyStore = store
+    }
+
+    fun registerPillagerTargetingEngine(
+        engine: PillagerSettlementTargetingEngine
+    ) {
+        pillagerTargetingEngine = engine
+    }
+
+    fun registerPillagerFactionCoordinator(
+        coordinator: PillagerFactionCoordinator
+    ) {
+        pillagerFactionCoordinator = coordinator
     }
 
     fun isAiStrategyCoordinatorInitialized(): Boolean {
