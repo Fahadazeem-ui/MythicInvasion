@@ -36,7 +36,9 @@ class ConfigurationManager(
                 "ecosystem.update-interval-ticks",
                 20L
             )
-            .coerceAtLeast(1L)
+            .coerceAtLeast(
+                1L
+            )
     }
 
     fun isWorldIntelligenceEnabled(): Boolean {
@@ -52,7 +54,9 @@ class ConfigurationManager(
                 "world-intelligence.update-interval-millis",
                 5_000L
             )
-            .coerceAtLeast(1_000L)
+            .coerceAtLeast(
+                1_000L
+            )
     }
 
     fun isSocietyEnabled(): Boolean {
@@ -68,7 +72,9 @@ class ConfigurationManager(
                 "society.observation-interval-millis",
                 10_000L
             )
-            .coerceAtLeast(2_000L)
+            .coerceAtLeast(
+                2_000L
+            )
     }
 
     fun villagerAnalysisIntervalMillis(): Long {
@@ -77,7 +83,9 @@ class ConfigurationManager(
                 "society.villager-analysis-interval-millis",
                 10_000L
             )
-            .coerceAtLeast(2_000L)
+            .coerceAtLeast(
+                2_000L
+            )
     }
 
     fun societySocialIntervalMillis(): Long {
@@ -86,7 +94,9 @@ class ConfigurationManager(
                 "society.social-interval-millis",
                 10_000L
             )
-            .coerceAtLeast(2_000L)
+            .coerceAtLeast(
+                2_000L
+            )
     }
 
     fun isBehaviourEnabled(): Boolean {
@@ -102,7 +112,9 @@ class ConfigurationManager(
                 "behaviour.processing-interval-millis",
                 1_000L
             )
-            .coerceAtLeast(50L)
+            .coerceAtLeast(
+                50L
+            )
     }
 
     fun behaviourDecayHalfLifeMinutes(): Double {
@@ -111,7 +123,9 @@ class ConfigurationManager(
                 "behaviour.decay.half-life-minutes",
                 30.0
             )
-            .coerceAtLeast(0.1)
+            .coerceAtLeast(
+                0.1
+            )
     }
 
     fun behaviourDecayHalfLifeMillis(): Long {
@@ -120,7 +134,9 @@ class ConfigurationManager(
                 60_000.0
             )
             .toLong()
-            .coerceAtLeast(1L)
+            .coerceAtLeast(
+                1L
+            )
     }
 
     fun isAiEnabled(): Boolean {
@@ -184,7 +200,9 @@ class ConfigurationManager(
                 "ai.strategy-interval-millis",
                 60_000L
             )
-            .coerceAtLeast(10_000L)
+            .coerceAtLeast(
+                10_000L
+            )
     }
 
     fun aiRequestTimeoutMillis(): Long {
@@ -193,7 +211,9 @@ class ConfigurationManager(
                 "ai.request-timeout-millis",
                 30_000L
             )
-            .coerceAtLeast(1_000L)
+            .coerceAtLeast(
+                1_000L
+            )
     }
 
     fun aiMaxContextCharacters(): Int {
@@ -202,7 +222,59 @@ class ConfigurationManager(
                 "ai.max-context-characters",
                 12_000
             )
-            .coerceAtLeast(1_000)
+            .coerceAtLeast(
+                1_000
+            )
+    }
+
+    fun isAdaptiveBehaviourEnabled(): Boolean {
+        return configuration.getBoolean(
+            "adaptive-behaviour.enabled",
+            true
+        )
+    }
+
+    fun isAdaptiveHostileTargetingEnabled(): Boolean {
+        return configuration.getBoolean(
+            "adaptive-behaviour.hostile-targeting.enabled",
+            true
+        )
+    }
+
+    fun adaptiveTargetRange(): Double {
+        return configuration
+            .getDouble(
+                "adaptive-behaviour.hostile-targeting.range",
+                32.0
+            )
+            .coerceIn(
+                8.0,
+                64.0
+            )
+    }
+
+    fun adaptiveTargetMinimumAdvantage(): Double {
+        return configuration
+            .getDouble(
+                "adaptive-behaviour.hostile-targeting.minimum-advantage",
+                0.12
+            )
+            .coerceIn(
+                0.01,
+                0.50
+            )
+    }
+
+    fun adaptiveTargetCooldownMillis(): Long {
+        return configuration
+            .getLong(
+                "adaptive-behaviour.hostile-targeting.cooldown-millis",
+                5_000L
+            )
+            .coerceIn(
+                1_000L,
+                30_000L
+            )
     }
 
     fun isDatabaseEnabled(): Boolean {
