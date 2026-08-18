@@ -38,39 +38,49 @@ class GeminiStrategyClient(
             }
             ?.let { key ->
 
+                val safeTimeoutMillis =
+                    timeoutMillis
+                        .coerceIn(
+                            30_000L,
+                            120_000L
+                        )
+                        .toInt()
+
+                val retryOptions =
+                    HttpRetryOptions
+                        .builder()
+                        .attempts(3)
+                        .httpStatusCodes(
+                            408,
+                            429,
+                            500,
+                            502,
+                            503,
+                            504
+                        )
+                        .initialDelay(1.0)
+                        .maxDelay(8.0)
+                        .expBase(2.0)
+                        .jitter(0.25)
+                        .build()
+
+                val httpOptions =
+                    HttpOptions
+                        .builder()
+                        .apiVersion("v1")
+                        .timeout(
+                            safeTimeoutMillis
+                        )
+                        .retryOptions(
+                            retryOptions
+                        )
+                        .build()
+
                 Client
                     .builder()
                     .apiKey(key)
                     .httpOptions(
-                        HttpOptions
-                            .builder()
-                            .apiVersion("v1")
-                            .timeout(
-                                timeoutMillis
-                                    .coerceIn(
-                                        30_000,
-                                        120_000
-                                    )
-                            )
-                            .retryOptions(
-                                HttpRetryOptions
-                                    .builder()
-                                    .attempts(3)
-                                    .httpStatusCodes(
-                                        408,
-                                        429,
-                                        500,
-                                        502,
-                                        503,
-                                        504
-                                    )
-                                    .initialDelay(1.0)
-                                    .maxDelay(8.0)
-                                    .expBase(2.0)
-                                    .jitter(0.25)
-                                    .build()
-                            )
-                            .build()
+                        httpOptions
                     )
                     .build()
             }
@@ -97,8 +107,8 @@ class GeminiStrategyClient(
             val requestTimeoutMillis =
                 timeoutMillis
                     .coerceIn(
-                        30_000,
-                        120_000
+                        30_000L,
+                        120_000L
                     )
 
             val future =
@@ -124,17 +134,11 @@ class GeminiStrategyClient(
                     )
                     .get()
 
-            val responseText =
-                response
-                    .text()
-
             parseDecision(
-                responseText
+                response.text()
             )
 
-        } catch (
-            exception: Exception
-        ) {
+        } catch (exception: Exception) {
 
             plugin.logger.warning(
                 "Gemini strategy request failed: " +
@@ -245,9 +249,10 @@ class GeminiStrategyClient(
                     ?: return null
 
             val suggestedActions =
-                root.arrayOfStrings(
-                    "suggestedActions"
-                )
+                root
+                    .arrayOfStrings(
+                        "suggestedActions"
+                    )
                     .take(10)
                     .map {
                         it.take(250)
@@ -290,9 +295,7 @@ class GeminiStrategyClient(
                     System.currentTimeMillis()
             )
 
-        } catch (
-            exception: Exception
-        ) {
+        } catch (exception: Exception) {
 
             plugin.logger.warning(
                 "Gemini returned invalid JSON."
@@ -360,11 +363,9 @@ class GeminiStrategyClient(
 
         val primitive:
             JsonPrimitive =
-            element
-                .jsonPrimitive
+            element.jsonPrimitive
 
-        return primitive
-            .content
+        return primitive.content
             .trim()
             .ifBlank {
                 null
