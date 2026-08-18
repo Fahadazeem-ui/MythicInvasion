@@ -21,56 +21,45 @@ import org.bukkit.scheduler.BukkitTask
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.sqrt
+import kotlin.random.Random
 
 class AnimalBehaviourListener(
     private val plugin: JavaPlugin
 ) : Listener {
 
     companion object {
+        private const val THINK_INTERVAL_TICKS = 60L
 
-        private const val THINK_INTERVAL_TICKS =
-            40L
+        private const val DANGER_RADIUS = 14.0
+        private const val HERD_RADIUS = 14.0
 
-        private const val DANGER_RADIUS =
-            12.0
+        private const val MIN_HERD_SPACING = 3.5
+        private const val COMFORT_RADIUS = 10.0
+        private const val RETURN_RADIUS = 18.0
 
-        private const val HERD_RADIUS =
-            10.0
+        private const val FLEE_DISTANCE = 9.0
+        private const val HERD_RETURN_SPEED = 0.60
+        private const val FLEE_SPEED = 1.00
+        private const val OWNER_SPEED = 0.65
 
-        private const val FLEE_DISTANCE =
-            7.0
+        private const val ACTION_COOLDOWN_MILLIS = 7_000L
+        private const val WANDER_MIN_DELAY_MILLIS = 8_000L
+        private const val WANDER_MAX_DELAY_MILLIS = 18_000L
 
-        private const val HERD_DISTANCE =
-            6.0
+        private const val MEMORY_HALF_LIFE_MILLIS = 120_000L
+        private const val MAX_DANGER_MEMORY = 100.0
 
-        private const val FLEE_SPEED =
-            0.95
-
-        private const val HERD_SPEED =
-            0.55
-
-        private const val WOLF_OWNER_SPEED =
-            0.65
-
-        private const val ACTION_COOLDOWN_MILLIS =
-            4_000L
-
-        private const val MEMORY_HALF_LIFE_MILLIS =
-            90_000L
-
-        private const val MAX_DANGER_MEMORY =
-            100.0
-
-        private const val PLAYER_ATTACK_MEMORY_GAIN =
-            25.0
-
-        private const val MONSTER_ATTACK_MEMORY_GAIN =
-            30.0
+        private const val PLAYER_ATTACK_MEMORY_GAIN = 30.0
+        private const val MONSTER_ATTACK_MEMORY_GAIN = 35.0
     }
 
     private data class DangerMemory(
         var score: Double,
         var updatedAtMillis: Long
+    )
+
+    private data class WanderState(
+        var nextWanderAtMillis: Long
     )
 
     private val dangerMemory =
@@ -79,123 +68,97 @@ class AnimalBehaviourListener(
     private val actionCooldowns =
         ConcurrentHashMap<UUID, Long>()
 
+    private val wanderStates =
+        ConcurrentHashMap<UUID, WanderState>()
+
     private val thinkTask: BukkitTask =
         plugin.server.scheduler.runTaskTimer(
             plugin,
-            Runnable {
-                think()
-            },
+            Runnable { think() },
             THINK_INTERVAL_TICKS,
             THINK_INTERVAL_TICKS
         )
 
     private fun think() {
-
-        val now =
-            System.currentTimeMillis()
+        val now = System.currentTimeMillis()
 
         for (world in plugin.server.worlds) {
-
             val animals =
                 world.entities
                     .asSequence()
                     .filterIsInstance<Animals>()
-                    .filter {
-                        !it.isDead
-                    }
+                    .filter { !it.isDead && it.isValid }
                     .toList()
 
             for (animal in animals) {
-
-                if (
-                    isOnCooldown(
-                        animal,
-                        now
-                    )
-                ) {
+                if (isOnCooldown(animal, now)) {
                     continue
                 }
 
-                val danger =
-                    findNearestDanger(
-                        animal
-                    )
+                val danger = findNearestDanger(animal)
 
                 if (danger != null) {
-
-                    rememberDanger(
-                        danger
-                    )
-
-                    flee(
-                        animal,
-                        danger
-                    )
-
-                    setCooldown(
-                        animal,
-                        now
-                    )
-
+                    rememberDanger(danger)
+                    flee(animal, danger)
+                    setCooldown(animal, now)
                     continue
                 }
 
-                /*
-                 * Wolves keep their native ownership/taming
-                 * system. We only give an owner-awareness signal.
-                 */
-                if (
-                    animal is Wolf &&
-                    animal.isTamed
-                ) {
+                if (animal is Wolf && animal.isTamed) {
+                    val owner = animal.owner as? Player
 
-                    val owner =
-                        animal.owner as? Player
-
-                    if (
-                        owner != null &&
-                        isValidPlayer(
-                            owner
-                        )
-                    ) {
-
-                        approachOwner(
-                            animal,
-                            owner
-                        )
-
-                        setCooldown(
-                            animal,
-                            now
-                        )
-
+                    if (owner != null && isValidPlayer(owner)) {
+                        approachOwner(animal, owner)
+                        setCooldown(animal, now)
                         continue
                     }
                 }
 
-                val herdMate =
-                    findNearestHerdMate(
-                        animal
-                    )
+                val herdMate = findNearestHerdMate(animal)
+                val herdDistance =
+                    herdMate?.let {
+                        sqrt(
+                            distanceSquared(
+                                animal,
+                                it
+                            )
+                        )
+                    } ?: Double.MAX_VALUE
 
-                if (herdMate != null) {
+                when {
+                    herdDistance < MIN_HERD_SPACING -> {
+                        moveAwayFrom(
+                            animal,
+                            herdMate,
+                            MIN_HERD_SPACING + 1.5
+                        )
+                        setCooldown(animal, now)
+                    }
 
-                    moveTowardHerd(
-                        animal,
-                        herdMate
-                    )
+                    herdDistance > RETURN_RADIUS -> {
+                        moveTowardHerd(
+                            animal,
+                            herdMate
+                        )
+                        setCooldown(animal, now)
+                    }
 
-                    setCooldown(
-                        animal,
-                        now
-                    )
+                    herdDistance <= COMFORT_RADIUS -> {
+                        maybeWander(animal, now)
+                    }
+
+                    else -> {
+                        moveTowardHerd(
+                            animal,
+                            herdMate
+                        )
+                        setCooldown(animal, now)
+                    }
                 }
             }
         }
 
-        decayAllMemory(
-            now
-        )
+        decayAllMemory(now)
     }
 
     @EventHandler(
@@ -205,37 +168,25 @@ class AnimalBehaviourListener(
     fun onAnimalDamaged(
         event: EntityDamageByEntityEvent
     ) {
+        val animal = event.entity as? Animals
+            ?: return
 
-        val animal =
-            event.entity as? Animals
-                ?: return
-
-        if (
-            animal.isDead
-        ) {
+        if (animal.isDead) {
             return
         }
 
-        when (
-            val attacker =
-                event.damager
-        ) {
-
-            is Player -> {
-
+        when (val attacker = event.damager) {
+            is Player ->
                 addDangerMemory(
                     attacker.uniqueId,
                     PLAYER_ATTACK_MEMORY_GAIN
                 )
-            }
 
-            is Monster -> {
-
+            is Monster ->
                 addDangerMemory(
                     attacker.uniqueId,
                     MONSTER_ATTACK_MEMORY_GAIN
                 )
-            }
         }
     }
 
@@ -246,30 +197,18 @@ class AnimalBehaviourListener(
     fun onAnimalTarget(
         event: EntityTargetLivingEntityEvent
     ) {
-
         event.entity as? Animals
             ?: return
 
-        val target =
-            event.target
-                ?: return
+        val target = event.target
+            ?: return
 
         if (
             target is Player &&
-            !isValidPlayer(
-                target
-            )
+            !isValidPlayer(target)
         ) {
-
-            event.target =
-                null
+            event.target = null
         }
-
-        /*
-         * Do not replace normal Minecraft target selection.
-         * This listener only removes clearly invalid player
-         * targets and supplies our own reactions in think().
-         */
     }
 
     @EventHandler(
@@ -279,40 +218,22 @@ class AnimalBehaviourListener(
     fun onPlayerInteract(
         event: PlayerInteractEntityEvent
     ) {
+        val animal = event.rightClicked as? Animals
+            ?: return
 
-        val animal =
-            event.rightClicked as? Animals
-                ?: return
+        val player = event.player
 
-        val player =
-            event.player
-
-        if (
-            !isValidPlayer(
-                player
-            )
-        ) {
+        if (!isValidPlayer(player)) {
             return
         }
 
-        /*
-         * A direct interaction is treated as a positive
-         * signal and removes any temporary danger memory
-         * associated with that player.
-         */
-        dangerMemory.remove(
-            player.uniqueId
-        )
+        dangerMemory.remove(player.uniqueId)
 
         if (
             animal is Wolf &&
-            animal.owner?.uniqueId ==
-                player.uniqueId
+            animal.owner?.uniqueId == player.uniqueId
         ) {
-
-            animal.lookAt(
-                player
-            )
+            animal.lookAt(player)
         }
     }
 
@@ -320,16 +241,12 @@ class AnimalBehaviourListener(
     fun onPlayerQuit(
         event: PlayerQuitEvent
     ) {
-
-        dangerMemory.remove(
-            event.player.uniqueId
-        )
+        dangerMemory.remove(event.player.uniqueId)
     }
 
     private fun findNearestDanger(
         animal: Animals
     ): LivingEntity? {
-
         return animal.world
             .getNearbyEntities(
                 animal.location,
@@ -339,44 +256,24 @@ class AnimalBehaviourListener(
             )
             .asSequence()
             .filterIsInstance<LivingEntity>()
-            .filter {
-                it.uniqueId !=
-                    animal.uniqueId
-            }
-            .filter {
-                !it.isDead
-            }
-            .filter {
-                isDangerous(
-                    it
-                )
-            }
+            .filter { it.uniqueId != animal.uniqueId }
+            .filter { !it.isDead }
+            .filter { isDangerous(it) }
             .minByOrNull {
-                distanceSquared(
-                    animal,
-                    it
-                )
+                distanceSquared(animal, it)
             }
     }
 
     private fun isDangerous(
         entity: LivingEntity
     ): Boolean {
-
-        if (
-            entity is Monster
-        ) {
+        if (entity is Monster) {
             return true
         }
 
-        if (
-            entity is Player
-        ) {
-
+        if (entity is Player) {
             val memory =
-                dangerMemory[
-                    entity.uniqueId
-                ]
+                dangerMemory[entity.uniqueId]
                     ?: return false
 
             decayMemory(
@@ -384,8 +281,7 @@ class AnimalBehaviourListener(
                 System.currentTimeMillis()
             )
 
-            return memory.score >=
-                15.0
+            return memory.score >= 15.0
         }
 
         return false
@@ -394,7 +290,6 @@ class AnimalBehaviourListener(
     private fun findNearestHerdMate(
         animal: Animals
     ): Animals? {
-
         return animal.world
             .getNearbyEntities(
                 animal.location,
@@ -404,22 +299,11 @@ class AnimalBehaviourListener(
             )
             .asSequence()
             .filterIsInstance<Animals>()
-            .filter {
-                it.uniqueId !=
-                    animal.uniqueId
-            }
-            .filter {
-                !it.isDead
-            }
-            .filter {
-                it.type ==
-                    animal.type
-            }
+            .filter { it.uniqueId != animal.uniqueId }
+            .filter { !it.isDead }
+            .filter { it.type == animal.type }
             .minByOrNull {
-                distanceSquared(
-                    animal,
-                    it
-                )
+                distanceSquared(animal, it)
             }
     }
 
@@ -427,89 +311,122 @@ class AnimalBehaviourListener(
         animal: Animals,
         danger: LivingEntity
     ) {
+        val mob = animal as? Mob
+            ?: return
 
-        val mob =
-            animal as? Mob
-                ?: return
-
-        val destination =
+        mob.pathfinder.moveTo(
             calculateFleeLocation(
                 animal.location,
                 danger.location
+            ),
+            FLEE_SPEED
+        )
+    }
+
+    private fun moveAwayFrom(
+        animal: Animals,
+        herdMate: Animals?,
+        distance: Double
+    ) {
+        val mate = herdMate ?: return
+        val mob = animal as? Mob
+            ?: return
+
+        mob.pathfinder.moveTo(
+            calculateFleeLocation(
+                animal.location,
+                mate.location,
+                distance
+            ),
+            HERD_RETURN_SPEED
+        )
+    }
+
+    private fun moveTowardHerd(
+        animal: Animals,
+        herdMate: Animals?
+    ) {
+        val mate = herdMate ?: return
+        val mob = animal as? Mob
+            ?: return
+
+        val destination =
+            calculateComfortLocation(
+                animal.location,
+                mate.location
             )
 
         mob.pathfinder.moveTo(
             destination,
-            FLEE_SPEED
+            HERD_RETURN_SPEED
+        )
+    }
+
+    private fun maybeWander(
+        animal: Animals,
+        now: Long
+    ) {
+        val state =
+            wanderStates.computeIfAbsent(
+                animal.uniqueId
+            ) {
+                WanderState(
+                    now +
+                        Random.nextLong(
+                            WANDER_MIN_DELAY_MILLIS,
+                            WANDER_MAX_DELAY_MILLIS
+                        )
+                )
+            }
+
+        if (now < state.nextWanderAtMillis) {
+            return
+        }
+
+        val mob = animal as? Mob
+            ?: return
+
+        mob.pathfinder.moveTo(
+            randomNearbyLocation(
+                animal.location
+            ),
+            0.50
         )
 
-        mob.lookAt(
-            danger
-        )
+        state.nextWanderAtMillis =
+            now +
+                Random.nextLong(
+                    WANDER_MIN_DELAY_MILLIS,
+                    WANDER_MAX_DELAY_MILLIS
+                )
     }
 
     private fun approachOwner(
         animal: Wolf,
         owner: Player
     ) {
-
         if (
             animal.location.distanceSquared(
                 owner.location
-            ) <=
-            9.0
+            ) <= 9.0
         ) {
-
-            animal.lookAt(
-                owner
-            )
-
+            animal.lookAt(owner)
             return
         }
 
         animal.pathfinder.moveTo(
             owner.location,
-            WOLF_OWNER_SPEED
-        )
-
-        animal.lookAt(
-            owner
-        )
-    }
-
-    private fun moveTowardHerd(
-        animal: Animals,
-        herdMate: Animals
-    ) {
-
-        val mob =
-            animal as? Mob
-                ?: return
-
-        val destination =
-            calculateHerdLocation(
-                animal.location,
-                herdMate.location
-            )
-
-        mob.pathfinder.moveTo(
-            destination,
-            HERD_SPEED
+            OWNER_SPEED
         )
     }
 
     private fun calculateFleeLocation(
         animal: Location,
-        danger: Location
+        danger: Location,
+        distance: Double = FLEE_DISTANCE
     ): Location {
-
-        var dx =
-            animal.x -
-                danger.x
-
-        var dz =
-            animal.z -
-                danger.z
+        var dx = animal.x - danger.x
+        var dz = animal.z - danger.z
 
         val length =
             sqrt(
@@ -517,88 +434,88 @@ class AnimalBehaviourListener(
                     dz * dz
             )
 
-        if (
-            length <=
-                0.001
-        ) {
-
-            dx =
-                1.0
-
-            dz =
-                0.0
-
+        if (length <= 0.001) {
+            dx = 1.0
+            dz = 0.0
         } else {
-
-            dx /=
-                length
-
-            dz /=
-                length
+            dx /= length
+            dz /= length
         }
 
         return animal.clone().apply {
-
-            x +=
-                dx *
-                    FLEE_DISTANCE
-
-            z +=
-                dz *
-                    FLEE_DISTANCE
+            x += dx * distance
+            z += dz * distance
         }
     }
 
-    private fun calculateHerdLocation(
+    private fun calculateComfortLocation(
         animal: Location,
         herdMate: Location
     ): Location {
+        var dx = herdMate.x - animal.x
+        var dz = herdMate.z - animal.z
 
-        val dx =
-            herdMate.x -
-                animal.x
-
-        val dz =
-            herdMate.z -
-                animal.z
-
-        val distance =
+        val length =
             sqrt(
                 dx * dx +
                     dz * dz
             )
 
-        if (
-            distance <=
-                0.001
-        ) {
+        if (length <= 0.001) {
             return animal
         }
 
+        val desired =
+            COMFORT_RADIUS.coerceAtMost(
+                length
+            )
+
         val scale =
-            HERD_DISTANCE /
-                distance
+            (
+                (length - desired) /
+                    length
+                )
+                .coerceIn(
+                    0.0,
+                    0.40
+                )
 
         return animal.clone().apply {
+            x += dx * scale
+            z += dz * scale
+        }
+    }
 
+    private fun randomNearbyLocation(
+        origin: Location
+    ): Location {
+        val angle =
+            Random.nextDouble(
+                0.0,
+                Math.PI * 2.0
+            )
+
+        val distance =
+            Random.nextDouble(
+                5.0,
+                11.0
+            )
+
+        return origin.clone().apply {
             x +=
-                dx *
-                    scale
-
+                kotlin.math.cos(angle) *
+                    distance
             z +=
-                dz *
-                    scale
+                kotlin.math.sin(angle) *
+                    distance
         }
     }
 
     private fun rememberDanger(
         danger: LivingEntity
     ) {
-
         val gain =
-            if (
-                danger is Monster
-            ) {
+            if (danger is Monster) {
                 MONSTER_ATTACK_MEMORY_GAIN
             } else {
                 PLAYER_ATTACK_MEMORY_GAIN
@@ -614,19 +531,15 @@ class AnimalBehaviourListener(
         id: UUID,
         amount: Double
     ) {
-
         val now =
             System.currentTimeMillis()
 
-        dangerMemory.compute(
-            id
-        ) { _, existing ->
-
+        dangerMemory.compute(id) { _, existing ->
             val memory =
                 existing
                     ?: DangerMemory(
-                        score = 0.0,
-                        updatedAtMillis = now
+                        0.0,
+                        now
                     )
 
             decayMemory(
@@ -643,9 +556,7 @@ class AnimalBehaviourListener(
                         MAX_DANGER_MEMORY
                     )
 
-            memory.updatedAtMillis =
-                now
-
+            memory.updatedAtMillis = now
             memory
         }
     }
@@ -653,18 +564,12 @@ class AnimalBehaviourListener(
     private fun decayAllMemory(
         now: Long
     ) {
-
-        dangerMemory.values.forEach { memory ->
-
-            decayMemory(
-                memory,
-                now
-            )
+        dangerMemory.values.forEach {
+            decayMemory(it, now)
         }
 
         dangerMemory.entries.removeIf {
-            it.value.score <
-                0.5
+            it.value.score < 0.5
         }
     }
 
@@ -672,59 +577,43 @@ class AnimalBehaviourListener(
         memory: DangerMemory,
         now: Long
     ) {
-
         val elapsed =
             now -
                 memory.updatedAtMillis
 
-        if (
-            elapsed <=
-                0L
-        ) {
+        if (elapsed <= 0L) {
             return
         }
 
         val halfLives =
             elapsed.toDouble() /
-                MEMORY_HALF_LIFE_MILLIS
-                    .toDouble()
+                MEMORY_HALF_LIFE_MILLIS.toDouble()
 
-        val factor =
+        memory.score *=
             Math.pow(
                 0.5,
                 halfLives
             )
 
-        memory.score *=
-            factor
-
-        memory.updatedAtMillis =
-            now
+        memory.updatedAtMillis = now
     }
 
     private fun isOnCooldown(
         animal: Animals,
         now: Long
     ): Boolean {
-
-        val nextAllowed =
-            actionCooldowns[
-                animal.uniqueId
-            ]
+        val next =
+            actionCooldowns[animal.uniqueId]
                 ?: return false
 
-        return now <
-            nextAllowed
+        return now < next
     }
 
     private fun setCooldown(
         animal: Animals,
         now: Long
     ) {
-
-        actionCooldowns[
-            animal.uniqueId
-        ] =
+        actionCooldowns[animal.uniqueId] =
             now +
                 ACTION_COOLDOWN_MILLIS
     }
@@ -732,18 +621,15 @@ class AnimalBehaviourListener(
     private fun isValidPlayer(
         player: Player
     ): Boolean {
-
         return player.isOnline &&
             !player.isDead &&
-            player.gameMode !=
-            GameMode.SPECTATOR
+            player.gameMode != GameMode.SPECTATOR
     }
 
     private fun distanceSquared(
         first: Entity,
         second: Entity
     ): Double {
-
         if (
             first.world.uid !=
                 second.world.uid
