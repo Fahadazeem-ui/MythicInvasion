@@ -11,6 +11,9 @@ import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntel
 import io.github.mindzard.mythicinvasion.application.society.FactionRelationService
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationCoordinator
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationEngine
+import io.github.mindzard.mythicinvasion.application.society.SettlementSocialCoordinator
+import io.github.mindzard.mythicinvasion.application.society.SettlementSocialEngine
+import io.github.mindzard.mythicinvasion.application.society.SettlementSocialStore
 import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipStore
@@ -109,6 +112,15 @@ class ServiceRegistry {
         private set
 
     lateinit var villagerRelationshipCoordinator: VillagerRelationshipCoordinator
+        private set
+
+    lateinit var settlementSocialEngine: SettlementSocialEngine
+        private set
+
+    lateinit var settlementSocialStore: SettlementSocialStore
+        private set
+
+    lateinit var settlementSocialCoordinator: SettlementSocialCoordinator
         private set
 
     fun registerConfigurationManager(
@@ -271,5 +283,23 @@ class ServiceRegistry {
         coordinator: VillagerRelationshipCoordinator
     ) {
         villagerRelationshipCoordinator = coordinator
+    }
+
+    fun registerSettlementSocialEngine(
+        engine: SettlementSocialEngine
+    ) {
+        settlementSocialEngine = engine
+    }
+
+    fun registerSettlementSocialStore(
+        store: SettlementSocialStore
+    ) {
+        settlementSocialStore = store
+    }
+
+    fun registerSettlementSocialCoordinator(
+        coordinator: SettlementSocialCoordinator
+    ) {
+        settlementSocialCoordinator = coordinator
     }
 }
