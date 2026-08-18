@@ -13,6 +13,9 @@ import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntel
 import io.github.mindzard.mythicinvasion.application.society.FactionRelationService
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationCoordinator
 import io.github.mindzard.mythicinvasion.application.society.SettlementObservationEngine
+import io.github.mindzard.mythicinvasion.application.society.SettlementSocialCoordinator
+import io.github.mindzard.mythicinvasion.application.society.SettlementSocialEngine
+import io.github.mindzard.mythicinvasion.application.society.SettlementSocialStore
 import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipEngine
@@ -43,9 +46,7 @@ class PluginBootstrap(
             ServiceRegistry()
 
         val configurationManager =
-            ConfigurationManager(
-                plugin
-            )
+            ConfigurationManager(plugin)
 
         configurationManager.load()
 
@@ -54,33 +55,21 @@ class PluginBootstrap(
         )
 
         val coroutineEngine =
-            CoroutineEngine(
-                plugin
-            )
+            CoroutineEngine(plugin)
 
         registry.registerCoroutineEngine(
             coroutineEngine
         )
 
-        /*
-         * =========================================================
-         * ECOSYSTEM SUBSYSTEM
-         * =========================================================
-         */
-
         val playerSnapshotCollector =
-            PlayerSnapshotCollector(
-                plugin
-            )
+            PlayerSnapshotCollector(plugin)
 
         registry.registerPlayerSnapshotCollector(
             playerSnapshotCollector
         )
 
         val ecosystemEngine =
-            EcosystemEngine(
-                plugin
-            )
+            EcosystemEngine(plugin)
 
         registry.registerEcosystemEngine(
             ecosystemEngine
@@ -102,12 +91,6 @@ class PluginBootstrap(
         registry.registerEcosystemCoordinator(
             ecosystemCoordinator
         )
-
-        /*
-         * =========================================================
-         * PLAYER BEHAVIOUR SUBSYSTEM
-         * =========================================================
-         */
 
         val behaviourEventBuffer =
             BehaviourEventBuffer()
@@ -173,16 +156,8 @@ class PluginBootstrap(
             behaviourProcessor
         )
 
-        /*
-         * =========================================================
-         * WORLD INTELLIGENCE SUBSYSTEM
-         * =========================================================
-         */
-
         val worldSnapshotCollector =
-            WorldSnapshotCollector(
-                plugin
-            )
+            WorldSnapshotCollector(plugin)
 
         registry.registerWorldSnapshotCollector(
             worldSnapshotCollector
@@ -219,16 +194,8 @@ class PluginBootstrap(
             worldIntelligenceCoordinator
         )
 
-        /*
-         * =========================================================
-         * SETTLEMENT SUBSYSTEM
-         * =========================================================
-         */
-
         val settlementObservationCollector =
-            SettlementObservationCollector(
-                plugin
-            )
+            SettlementObservationCollector(plugin)
 
         registry.registerSettlementObservationCollector(
             settlementObservationCollector
@@ -272,16 +239,8 @@ class PluginBootstrap(
             settlementObservationCoordinator
         )
 
-        /*
-         * =========================================================
-         * VILLAGER SOCIETY SUBSYSTEM
-         * =========================================================
-         */
-
         val villagerObservationCollector =
-            VillagerObservationCollector(
-                plugin
-            )
+            VillagerObservationCollector(plugin)
 
         registry.registerVillagerObservationCollector(
             villagerObservationCollector
@@ -318,12 +277,6 @@ class PluginBootstrap(
         registry.registerVillagerSocietyCoordinator(
             villagerSocietyCoordinator
         )
-
-        /*
-         * =========================================================
-         * VILLAGER ↔ PLAYER RELATIONSHIP SUBSYSTEM
-         * =========================================================
-         */
 
         val villagerRelationshipEngine =
             VillagerRelationshipEngine()
@@ -362,11 +315,39 @@ class PluginBootstrap(
             villagerRelationshipCoordinator
         )
 
-        /*
-         * =========================================================
-         * MINECRAFT EVENT LISTENERS
-         * =========================================================
-         */
+        val settlementSocialEngine =
+            SettlementSocialEngine()
+
+        registry.registerSettlementSocialEngine(
+            settlementSocialEngine
+        )
+
+        val settlementSocialStore =
+            SettlementSocialStore()
+
+        registry.registerSettlementSocialStore(
+            settlementSocialStore
+        )
+
+        val settlementSocialCoordinator =
+            SettlementSocialCoordinator(
+                plugin = plugin,
+                coroutineEngine = coroutineEngine,
+                relationshipStore =
+                    villagerRelationshipStore,
+                engine =
+                    settlementSocialEngine,
+                socialStore =
+                    settlementSocialStore,
+                updateIntervalMillis = {
+                    configurationManager
+                        .societySocialIntervalMillis()
+                }
+            )
+
+        registry.registerSettlementSocialCoordinator(
+            settlementSocialCoordinator
+        )
 
         plugin.server.pluginManager.registerEvents(
             PlayerBehaviourListener(
@@ -375,25 +356,13 @@ class PluginBootstrap(
             plugin
         )
 
-        /*
-         * =========================================================
-         * DEBUG COMMANDS
-         * =========================================================
-         */
-
-        plugin.getCommand(
-            "society"
-        )?.setExecutor(
-            SocietyDebugCommand(
-                societyStateStore
+        plugin.getCommand("society")
+            ?.setExecutor(
+                SocietyDebugCommand(
+                    societyStateStore = societyStateStore,
+                    socialStore = settlementSocialStore
+                )
             )
-        )
-
-        /*
-         * =========================================================
-         * START ENABLED SUBSYSTEMS
-         * =========================================================
-         */
 
         if (
             configurationManager
@@ -423,6 +392,7 @@ class PluginBootstrap(
             settlementObservationCoordinator.start()
             villagerSocietyCoordinator.start()
             villagerRelationshipCoordinator.start()
+            settlementSocialCoordinator.start()
         }
 
         plugin.logger.info(
