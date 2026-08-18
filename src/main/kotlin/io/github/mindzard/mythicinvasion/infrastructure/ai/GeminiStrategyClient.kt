@@ -3,14 +3,15 @@ package io.github.mindzard.mythicinvasion.infrastructure.ai
 import com.google.genai.Client
 import com.google.genai.types.GenerateContentConfig
 import io.github.mindzard.mythicinvasion.domain.ai.AiDecision
-import io.github.mindzard.mythicinvasion.domain.ai.AiStrategicContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.double
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.booleanOrNull
 import org.bukkit.plugin.java.JavaPlugin
 import java.util.concurrent.TimeUnit
 
@@ -23,18 +24,17 @@ class GeminiStrategyClient(
     private val json =
         Json {
             ignoreUnknownKeys = true
+            isLenient = true
         }
 
     private val client: Client? =
         System.getenv("GOOGLE_API_KEY")
             ?.trim()
-            ?.takeIf {
-                it.isNotEmpty()
-            }
-            ?.let {
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { apiKey ->
                 Client
                     .builder()
-                    .apiKey(it)
+                    .apiKey(apiKey)
                     .build()
             }
 
@@ -57,6 +57,10 @@ class GeminiStrategyClient(
 
         return try {
 
+            /*
+             * The Google Gen AI Java SDK exposes async model generation
+             * through client.async.models.generateContent(...).
+             */
             val future =
                 activeClient
                     .async
@@ -109,17 +113,20 @@ class GeminiStrategyClient(
             You must return exactly one high-level strategic decision.
 
             Your decision must:
+
             - be conservative and believable;
             - never invent unavailable world facts;
             - never request impossible Minecraft actions;
-            - avoid directly controlling individual entities;
-            - prefer strategies that can be executed by a deterministic
+            - never directly control individual entities;
+            - prefer strategies executable by a deterministic
               local game engine;
             - preserve player agency;
             - avoid repetitive escalation;
-            - consider settlement safety and social relationships.
+            - consider settlement safety;
+            - consider player relationships;
+            - consider current world state.
 
-            Return ONLY JSON with this structure:
+            Return ONLY valid JSON with this exact structure:
 
             {
               "strategyId": "string",
@@ -127,7 +134,9 @@ class GeminiStrategyClient(
               "summary": "string",
               "reasoning": "string",
               "confidence": 0.0,
-              "suggestedActions": ["string"]
+              "suggestedActions": [
+                "string"
+              ]
             }
 
             World context:
@@ -140,66 +149,83 @@ class GeminiStrategyClient(
         rawText: String?
     ): AiDecision? {
 
-        if (
-            rawText.isNullOrBlank()
-        ) {
+        if (rawText.isNullOrBlank()) {
             return null
         }
 
         return try {
 
-            val objectNode =
-                json.parseToJsonElement(
+            /*
+             * Gemini is instructed to return JSON, but models can
+             * occasionally wrap JSON in markdown fences.
+             *
+             * Clean those fences before parsing.
+             */
+            val cleaned =
+                cleanJsonResponse(
                     rawText
-                ).jsonObject
+                )
+
+            val rootElement =
+                json.parseToJsonElement(
+                    cleaned
+                )
+
+            val rootObject: JsonObject =
+                rootElement.jsonObject
 
             val strategyId =
-                objectNode[
-                    "strategyId"
-                ]?.jsonPrimitive?.contentOrNull
+                rootObject
+                    .stringValue(
+                        "strategyId"
+                    )
                     ?: return null
 
             val priority =
-                objectNode[
-                    "priority"
-                ]?.jsonPrimitive?.int
+                rootObject
+                    .intValue(
+                        "priority"
+                    )
                     ?: return null
 
             val summary =
-                objectNode[
-                    "summary"
-                ]?.jsonPrimitive?.contentOrNull
+                rootObject
+                    .stringValue(
+                        "summary"
+                    )
                     ?: return null
 
             val reasoning =
-                objectNode[
-                    "reasoning"
-                ]?.jsonPrimitive?.contentOrNull
+                rootObject
+                    .stringValue(
+                        "reasoning"
+                    )
                     ?: return null
 
             val confidence =
-                objectNode[
-                    "confidence"
-                ]?.jsonPrimitive?.double
+                rootObject
+                    .doubleValue(
+                        "confidence"
+                    )
                     ?: return null
 
-            val actions =
-                objectNode[
-                    "suggestedActions"
-                ]?.let {
-                    element ->
-                    element
-                        .jsonArray
-                        .mapNotNull {
-                            it.jsonPrimitive
-                                .contentOrNull
-                        }
-                }
-                    ?: emptyList()
+            val suggestedActions =
+                rootObject
+                    .arrayOfStrings(
+                        "suggestedActions"
+                    )
+                    .take(
+                        10
+                    )
+                    .map {
+                        it.take(250)
+                    }
 
-            AiDecision(
+            return AiDecision(
                 strategyId =
-                    strategyId,
+                    strategyId
+                        .trim()
+                        .take(100),
 
                 priority =
                     priority
@@ -209,23 +235,24 @@ class GeminiStrategyClient(
                         ),
 
                 summary =
-                    summary.take(500),
+                    summary
+                        .trim()
+                        .take(500),
 
                 reasoning =
-                    reasoning.take(2_000),
+                    reasoning
+                        .trim()
+                        .take(2_000),
 
                 confidence =
-                    confidence.coerceIn(
-                        0.0,
-                        1.0
-                    ),
+                    confidence
+                        .coerceIn(
+                            0.0,
+                            1.0
+                        ),
 
                 suggestedActions =
-                    actions
-                        .take(10)
-                        .map {
-                            it.take(250)
-                        },
+                    suggestedActions,
 
                 generatedAtMillis =
                     System.currentTimeMillis()
@@ -234,10 +261,130 @@ class GeminiStrategyClient(
         } catch (exception: Exception) {
 
             plugin.logger.warning(
-                "Gemini returned an invalid strategic response."
+                "Gemini returned an invalid strategic JSON response."
+            )
+
+            plugin.logger.fine(
+                "Gemini raw response: $rawText"
             )
 
             null
         }
+    }
+
+    private fun cleanJsonResponse(
+        rawText: String
+    ): String {
+
+        var cleaned =
+            rawText.trim()
+
+        if (
+            cleaned.startsWith(
+                "```"
+            )
+        ) {
+
+            cleaned =
+                cleaned
+                    .removePrefix(
+                        "```json"
+                    )
+                    .removePrefix(
+                        "```JSON"
+                    )
+                    .removePrefix(
+                        "```"
+                    )
+                    .trim()
+
+            if (
+                cleaned.endsWith(
+                    "```"
+                )
+            ) {
+
+                cleaned =
+                    cleaned
+                        .removeSuffix(
+                            "```"
+                        )
+                        .trim()
+            }
+        }
+
+        return cleaned
+    }
+
+    private fun JsonObject.stringValue(
+        key: String
+    ): String? {
+
+        val element =
+            this[key]
+                ?: return null
+
+        val primitive: JsonPrimitive =
+            element.jsonPrimitive
+
+        return primitive
+            .content
+            .trim()
+            .ifBlank {
+                null
+            }
+    }
+
+    private fun JsonObject.intValue(
+        key: String
+    ): Int? {
+
+        val element =
+            this[key]
+                ?: return null
+
+        return element
+            .jsonPrimitive
+            .intOrNull
+    }
+
+    private fun JsonObject.doubleValue(
+        key: String
+    ): Double? {
+
+        val element =
+            this[key]
+                ?: return null
+
+        return element
+            .jsonPrimitive
+            .doubleOrNull
+    }
+
+    private fun JsonObject.arrayOfStrings(
+        key: String
+    ): List<String> {
+
+        val element =
+            this[key]
+                ?: return emptyList()
+
+        val array: JsonArray =
+            element.jsonArray
+
+        return array
+            .mapNotNull { element ->
+
+                val primitive =
+                    element
+                        .jsonPrimitive
+
+                primitive
+                    .content
+                    .trim()
+                    .ifBlank {
+                        null
+                    }
+            }
     }
 }
