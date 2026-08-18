@@ -81,12 +81,7 @@ class VillagerCitizenCoordinator(
 
         job?.cancel()
         job = null
-
         actionCooldowns.clear()
-
-        plugin.logger.info(
-            "Villager citizen behaviour coordinator stopped."
-        )
     }
 
     private fun processVillagers() {
@@ -104,12 +99,12 @@ class VillagerCitizenCoordinator(
 
         for (world in plugin.server.worlds) {
 
-            val villagers =
+            for (
+                villager in
                 world.getEntitiesByClass(
                     Villager::class.java
                 )
-
-            for (villager in villagers) {
+            ) {
 
                 if (villager.isDead) {
                     continue
@@ -123,8 +118,8 @@ class VillagerCitizenCoordinator(
                         ?: continue
 
                 processVillager(
-                    villager = villager,
-                    settlement = settlement
+                    villager,
+                    settlement
                 )
             }
         }
@@ -132,7 +127,9 @@ class VillagerCitizenCoordinator(
 
     private fun processVillager(
         villager: Villager,
-        settlement: io.github.mindzard.mythicinvasion.domain.society.SettlementState
+        settlement:
+            io.github.mindzard.mythicinvasion
+                .domain.society.SettlementState
     ) {
 
         val now =
@@ -150,10 +147,6 @@ class VillagerCitizenCoordinator(
             return
         }
 
-        /*
-         * Highest priority:
-         * nearby immediate danger.
-         */
         val danger =
             findNearbyDanger(
                 villager
@@ -162,25 +155,20 @@ class VillagerCitizenCoordinator(
         if (danger != null) {
 
             handleDanger(
-                villager = villager,
-                danger = danger,
-                settlement = settlement
+                villager,
+                danger,
+                settlement
             )
 
-            actionCooldowns[
-                villager.uniqueId
-            ] =
-                now +
-                    actionCooldownMillis
+            setCooldown(
+                villager,
+                now
+            )
 
             return
         }
 
-        /*
-         * Second priority:
-         * relationship-driven player behaviour.
-         */
-        val nearbyPlayers =
+        val relationships =
             villager.location
                 .getNearbyPlayers(
                     interactionRadius
@@ -189,16 +177,11 @@ class VillagerCitizenCoordinator(
                     it.isOnline &&
                         !it.isDead
                 }
-
-        val relationships =
-            nearbyPlayers
                 .mapNotNull { player ->
 
                     relationshipStore.get(
-                        villagerId =
-                            villager.uniqueId,
-                        playerId =
-                            player.uniqueId
+                        villager.uniqueId,
+                        player.uniqueId
                     )
                         ?.let {
                             player to it
@@ -209,12 +192,10 @@ class VillagerCitizenCoordinator(
             relationships
                 .asSequence()
                 .filter { (_, relationship) ->
-
                     relationship.threat >=
                         hostileThreatThreshold
                 }
                 .filter { (player, _) ->
-
                     distanceSquared(
                         villager.location,
                         player.location
@@ -223,24 +204,22 @@ class VillagerCitizenCoordinator(
                         hostileRadius
                 }
                 .maxByOrNull { (_, relationship) ->
-
                     relationship.threat
                 }
 
         if (hostile != null) {
 
             handleHostilePlayer(
-                villager = villager,
-                player = hostile.first,
-                settlement = settlement,
-                relationship = hostile.second
+                villager,
+                hostile.first,
+                settlement,
+                hostile.second
             )
 
-            actionCooldowns[
-                villager.uniqueId
-            ] =
-                now +
-                    actionCooldownMillis
+            setCooldown(
+                villager,
+                now
+            )
 
             return
         }
@@ -249,12 +228,10 @@ class VillagerCitizenCoordinator(
             relationships
                 .asSequence()
                 .filter { (_, relationship) ->
-
                     relationship.trust >=
                         friendlyTrustThreshold
                 }
                 .filter { (player, _) ->
-
                     distanceSquared(
                         villager.location,
                         player.location
@@ -263,34 +240,24 @@ class VillagerCitizenCoordinator(
                         friendlyLookRadius
                 }
                 .maxByOrNull { (_, relationship) ->
-
                     relationship.trust
                 }
 
         if (friendly != null) {
 
             handleFriendlyPlayer(
-                villager = villager,
-                player = friendly.first
+                villager,
+                friendly.first
             )
 
-            actionCooldowns[
-                villager.uniqueId
-            ] =
-                now +
-                    actionCooldownMillis
+            setCooldown(
+                villager,
+                now
+            )
 
             return
         }
 
-        /*
-         * Third priority:
-         * villagers naturally acknowledge nearby citizens.
-         *
-         * We intentionally do not spam movement or force a new
-         * path every tick. Native villager AI remains responsible
-         * for most movement.
-         */
         val nearbyVillager =
             findNearestVillager(
                 villager
@@ -298,67 +265,31 @@ class VillagerCitizenCoordinator(
 
         if (nearbyVillager != null) {
 
-            handleSocialAwareness(
-                villager = villager,
-                otherVillager = nearbyVillager
+            villager.lookAt(
+                nearbyVillager
             )
 
-            actionCooldowns[
-                villager.uniqueId
-            ] =
-                now +
-                    actionCooldownMillis
+            setCooldown(
+                villager,
+                now
+            )
         }
-    }
-
-    private fun findNearbyDanger(
-        villager: Villager
-    ): Monster? {
-
-        val nearbyEntities =
-            villager.world
-                .getNearbyEntities(
-                    villager.location,
-                    10.0,
-                    6.0,
-                    10.0
-                )
-
-        return nearbyEntities
-            .asSequence()
-            .filterIsInstance<Monster>()
-            .filter {
-                !it.isDead
-            }
-            .filter {
-                it !is Villager
-            }
-            .minByOrNull {
-                distanceSquared(
-                    villager.location,
-                    it.location
-                )
-            }
     }
 
     private fun handleDanger(
         villager: Villager,
         danger: Monster,
         settlement:
-            io.github.mindzard.mythicinvasion.domain.society.SettlementState
+            io.github.mindzard.mythicinvasion
+                .domain.society.SettlementState
     ) {
 
-        /*
-         * Danger response is defensive.
-         *
-         * We do not force villagers to attack.
-         * We move them toward a safer point inside their settlement.
-         */
         val retreat =
-            calculateSafeRetreatLocation(
-                villager = villager,
-                danger = danger,
-                settlement = settlement
+            calculateRetreat(
+                villager.location,
+                danger.location,
+                settlement,
+                10.0
             )
 
         if (retreat != null) {
@@ -373,10 +304,6 @@ class VillagerCitizenCoordinator(
             danger
         )
 
-        /*
-         * ANGRY_AT is reserved for actual threat memory.
-         * The native villager brain can use this signal.
-         */
         if (danger is Pillager) {
 
             villager.setMemory(
@@ -389,7 +316,7 @@ class VillagerCitizenCoordinator(
 
             plugin.logger.info(
                 "Villager ${villager.uniqueId} " +
-                    "detected danger ${danger.type}."
+                    "detected ${danger.type}"
             )
         }
     }
@@ -398,23 +325,22 @@ class VillagerCitizenCoordinator(
         villager: Villager,
         player: Player,
         settlement:
-            io.github.mindzard.mythicinvasion.domain.society.SettlementState,
+            io.github.mindzard.mythicinvasion
+                .domain.society.SettlementState,
         relationship: PlayerVillagerRelationship
     ) {
 
-        /*
-         * Villagers should feel cautious, not magically aggressive.
-         */
         villager.setMemory(
             MemoryKey.ANGRY_AT,
             player.uniqueId
         )
 
         val retreat =
-            calculatePlayerRetreatLocation(
-                villager = villager,
-                player = player,
-                settlement = settlement
+            calculateRetreat(
+                villager.location,
+                player.location,
+                settlement,
+                8.0
             )
 
         if (retreat != null) {
@@ -433,7 +359,7 @@ class VillagerCitizenCoordinator(
 
             plugin.logger.info(
                 "Villager ${villager.uniqueId} " +
-                    "reacted defensively to " +
+                    "reacted to hostile player " +
                     "${player.name} " +
                     "(threat=" +
                     "%.2f".format(
@@ -449,9 +375,6 @@ class VillagerCitizenCoordinator(
         player: Player
     ) {
 
-        /*
-         * Native villager memory keeps the positive signal alive.
-         */
         villager.setMemory(
             MemoryKey.LIKED_PLAYER,
             player.uniqueId
@@ -461,10 +384,6 @@ class VillagerCitizenCoordinator(
             player
         )
 
-        /*
-         * Small, non-spammy social acknowledgement.
-         * Native pathfinding remains in charge.
-         */
         if (
             distanceSquared(
                 villager.location,
@@ -477,168 +396,117 @@ class VillagerCitizenCoordinator(
                 0.55
             )
         }
-
-        if (debugEnabled()) {
-
-            plugin.logger.info(
-                "Villager ${villager.uniqueId} " +
-                    "recognized trusted player " +
-                    player.name
-            )
-        }
     }
 
-    private fun handleSocialAwareness(
-        villager: Villager,
-        otherVillager: Villager
-    ) {
+    private fun findNearbyDanger(
+        villager: Villager
+    ): Monster? {
 
-        /*
-         * Villagers occasionally acknowledge each other
-         * instead of every villager permanently following
-         * every other villager.
-         */
-        villager.lookAt(
-            otherVillager
-        )
-
-        if (
-            villager.profession ==
-                Villager.Profession.FARMER
-        ) {
-
-            villager.memory(
-                MemoryKey.JOB_SITE
+        return villager.world
+            .getNearbyEntities(
+                villager.location,
+                10.0,
+                6.0,
+                10.0
             )
-        }
+            .asSequence()
+            .filterIsInstance<Monster>()
+            .filter {
+                !it.isDead
+            }
+            .minByOrNull {
+                distanceSquared(
+                    villager.location,
+                    it.location
+                )
+            }
     }
 
-    private fun calculatePlayerRetreatLocation(
-        villager: Villager,
-        player: Player,
+    private fun findNearestVillager(
+        villager: Villager
+    ): Villager? {
+
+        return villager.world
+            .getNearbyEntities(
+                villager.location,
+                8.0,
+                4.0,
+                8.0
+            )
+            .asSequence()
+            .filterIsInstance<Villager>()
+            .filter {
+                it.uniqueId !=
+                    villager.uniqueId
+            }
+            .filter {
+                !it.isDead
+            }
+            .minByOrNull {
+                distanceSquared(
+                    villager.location,
+                    it.location
+                )
+            }
+    }
+
+    private fun calculateRetreat(
+        villagerLocation: Location,
+        threatLocation: Location,
         settlement:
-            io.github.mindzard.mythicinvasion.domain.society.SettlementState
+            io.github.mindzard.mythicinvasion
+                .domain.society.SettlementState,
+        retreatDistance: Double
     ): Location? {
-
-        val villagerLocation =
-            villager.location
-
-        val playerLocation =
-            player.location
 
         var dx =
             villagerLocation.x -
-                playerLocation.x
+                threatLocation.x
 
         var dz =
             villagerLocation.z -
-                playerLocation.z
+                threatLocation.z
 
-        val distance =
+        val length =
             sqrt(
                 dx * dx +
                     dz * dz
             )
 
-        if (distance <= 0.001) {
+        if (length <= 0.001) {
 
             dx = 1.0
             dz = 0.0
 
         } else {
 
-            dx /=
-                distance
-
-            dz /=
-                distance
+            dx /= length
+            dz /= length
         }
 
-        val retreatDistance =
-            8.0
-
-        return clampInsideSettlement(
-            settlement =
-                settlement,
-            location =
-                Location(
-                    villager.world,
-                    villagerLocation.x +
-                        dx *
-                        retreatDistance,
-                    villagerLocation.y,
-                    villagerLocation.z +
-                        dz *
-                        retreatDistance
-                )
-        )
-    }
-
-    private fun calculateSafeRetreatLocation(
-        villager: Villager,
-        danger: Monster,
-        settlement:
-            io.github.mindzard.mythicinvasion.domain.society.SettlementState
-    ): Location? {
-
-        val villagerLocation =
-            villager.location
-
-        val dangerLocation =
-            danger.location
-
-        var dx =
-            villagerLocation.x -
-                dangerLocation.x
-
-        var dz =
-            villagerLocation.z -
-                dangerLocation.z
-
-        val distance =
-            sqrt(
-                dx * dx +
-                    dz * dz
+        val raw =
+            Location(
+                villagerLocation.world,
+                villagerLocation.x +
+                    dx *
+                    retreatDistance,
+                villagerLocation.y,
+                villagerLocation.z +
+                    dz *
+                    retreatDistance
             )
 
-        if (distance <= 0.001) {
-
-            dx = 1.0
-            dz = 0.0
-
-        } else {
-
-            dx /=
-                distance
-
-            dz /=
-                distance
-        }
-
-        val retreatDistance =
-            10.0
-
         return clampInsideSettlement(
-            settlement =
-                settlement,
-            location =
-                Location(
-                    villager.world,
-                    villagerLocation.x +
-                        dx *
-                        retreatDistance,
-                    villagerLocation.y,
-                    villagerLocation.z +
-                        dz *
-                        retreatDistance
-                )
+            raw,
+            settlement
         )
     }
 
     private fun clampInsideSettlement(
+        location: Location,
         settlement:
-            io.github.mindzard.mythicinvasion.domain.society.SettlementState,
-        location: Location
+            io.github.mindzard.mythicinvasion
+                .domain.society.SettlementState
     ): Location? {
 
         val centerX =
@@ -706,42 +574,16 @@ class VillagerCitizenCoordinator(
         )
     }
 
-    private fun findNearestVillager(
-        villager: Villager
-    ): Villager? {
-
-        return villager.world
-            .getNearbyEntities(
-                villager.location,
-                8.0,
-                4.0,
-                8.0
-            )
-            .asSequence()
-            .filterIsInstance<Villager>()
-            .filter {
-                it.uniqueId !=
-                    villager.uniqueId
-            }
-            .filter {
-                !it.isDead
-            }
-            .minByOrNull {
-                distanceSquared(
-                    villager.location,
-                    it.location
-                )
-            }
-    }
-
     private fun findSettlement(
         location: Location,
         settlements:
             Collection<
-                io.github.mindzard.mythicinvasion.domain.society.SettlementState
+                io.github.mindzard.mythicinvasion
+                    .domain.society.SettlementState
             >
     ):
-        io.github.mindzard.mythicinvasion.domain.society.SettlementState? {
+        io.github.mindzard.mythicinvasion
+            .domain.society.SettlementState? {
 
         val world =
             location.world
@@ -767,28 +609,47 @@ class VillagerCitizenCoordinator(
                     location.z -
                         settlement.centerZ
 
-                val distanceSquared =
-                    dx * dx +
-                        dy * dy +
-                        dz * dz
-
                 settlement to
-                    distanceSquared
+                    (
+                        dx * dx +
+                            dy * dy +
+                            dz * dz
+                        )
             }
             .filter { (settlement, distanceSquared) ->
 
                 val radius =
-                    settlement.radius
-                        .toDouble()
+                    settlement.radius.toDouble()
 
                 distanceSquared <=
-                    radius *
-                    radius
+                    radius * radius
             }
             .minByOrNull {
                 it.second
             }
             ?.first
+    }
+
+    private fun setCooldown(
+        villager: Villager,
+        now: Long
+    ) {
+
+        actionCooldowns[
+            villager.uniqueId
+        ] =
+            now +
+                actionCooldownMillis
+    }
+
+    private fun cleanupCooldowns() {
+
+        val now =
+            System.currentTimeMillis()
+
+        actionCooldowns.entries.removeIf {
+            it.value <= now
+        }
     }
 
     private fun distanceSquared(
@@ -822,30 +683,11 @@ class VillagerCitizenCoordinator(
             )
     }
 
-    private fun cleanupCooldowns() {
-
-        val now =
-            System.currentTimeMillis()
-
-        actionCooldowns.entries.removeIf {
-            it.value <=
-                now
-        }
-    }
-
     private fun debugEnabled(): Boolean {
 
         return plugin.config.getBoolean(
             "plugin.debug",
             false
-        )
-    }
-
-    private fun Villager.memory(
-        key: MemoryKey<UUID>
-    ) {
-        getMemory(
-            key
         )
     }
 }
