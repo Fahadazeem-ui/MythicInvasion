@@ -17,24 +17,73 @@ class ConfigurationManager(
     }
 
     fun isDebugEnabled(): Boolean {
-        return configuration.getBoolean("plugin.debug", false)
+        return configuration.getBoolean(
+            "plugin.debug",
+            false
+        )
     }
 
     fun isEcosystemEnabled(): Boolean {
-        return configuration.getBoolean("ecosystem.enabled", true)
+        return configuration.getBoolean(
+            "ecosystem.enabled",
+            true
+        )
     }
 
     fun ecosystemUpdateIntervalTicks(): Long {
         return configuration
-            .getLong("ecosystem.update-interval-ticks", 20L)
+            .getLong(
+                "ecosystem.update-interval-ticks",
+                20L
+            )
+            .coerceAtLeast(1L)
+    }
+
+    fun isBehaviourEnabled(): Boolean {
+        return configuration.getBoolean(
+            "behaviour.enabled",
+            true
+        )
+    }
+
+    fun behaviourProcessingIntervalMillis(): Long {
+        return configuration
+            .getLong(
+                "behaviour.processing-interval-millis",
+                1_000L
+            )
+            .coerceAtLeast(50L)
+    }
+
+    fun behaviourDecayHalfLifeMinutes(): Double {
+        return configuration
+            .getDouble(
+                "behaviour.decay.half-life-minutes",
+                30.0
+            )
+            .coerceAtLeast(0.1)
+    }
+
+    fun behaviourDecayHalfLifeMillis(): Long {
+        return (
+            behaviourDecayHalfLifeMinutes() *
+                60_000.0
+            )
+            .toLong()
             .coerceAtLeast(1L)
     }
 
     fun isAiEnabled(): Boolean {
-        return configuration.getBoolean("ai.enabled", false)
+        return configuration.getBoolean(
+            "ai.enabled",
+            false
+        )
     }
 
     fun isDatabaseEnabled(): Boolean {
-        return configuration.getBoolean("database.enabled", false)
+        return configuration.getBoolean(
+            "database.enabled",
+            false
+        )
     }
 }
