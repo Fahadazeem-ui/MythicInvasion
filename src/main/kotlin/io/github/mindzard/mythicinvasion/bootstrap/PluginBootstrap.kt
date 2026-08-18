@@ -626,6 +626,14 @@ class PluginBootstrap(
         )
 
         plugin.server.pluginManager.registerEvents(
+            AnimalBehaviourListener(
+                plugin =
+                    plugin
+            ),
+            plugin
+        )
+
+        plugin.server.pluginManager.registerEvents(
             PlayerBehaviourListener(
                 buffer =
                     behaviourEventBuffer
