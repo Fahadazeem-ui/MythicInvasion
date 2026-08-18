@@ -10,14 +10,20 @@ import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemCoordina
 import io.github.mindzard.mythicinvasion.application.ecosystem.EcosystemEngine
 import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceEngine
 import io.github.mindzard.mythicinvasion.application.intelligence.BehaviourIntelligenceStore
+import io.github.mindzard.mythicinvasion.application.society.FactionRelationService
+import io.github.mindzard.mythicinvasion.application.society.SettlementObservationCoordinator
+import io.github.mindzard.mythicinvasion.application.society.SettlementObservationEngine
+import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
 import io.github.mindzard.mythicinvasion.application.world.WorldIntelligenceCoordinator
 import io.github.mindzard.mythicinvasion.application.world.WorldIntelligenceEngine
 import io.github.mindzard.mythicinvasion.application.world.WorldStateStore
 import io.github.mindzard.mythicinvasion.concurrency.CoroutineEngine
 import io.github.mindzard.mythicinvasion.config.ConfigurationManager
+import io.github.mindzard.mythicinvasion.infrastructure.paper.command.SocietyDebugCommand
 import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.PlayerSnapshotCollector
-import io.github.mindzard.mythicinvasion.infrastructure.paper.world.WorldSnapshotCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.player.PlayerBehaviourListener
+import io.github.mindzard.mythicinvasion.infrastructure.paper.society.SettlementObservationCollector
+import io.github.mindzard.mythicinvasion.infrastructure.paper.world.WorldSnapshotCollector
 
 class PluginBootstrap(
     private val plugin: MythicInvasionPlugin
@@ -47,6 +53,10 @@ class PluginBootstrap(
         registry.registerCoroutineEngine(
             coroutineEngine
         )
+
+        /*
+         * Ecosystem subsystem.
+         */
 
         val playerSnapshotCollector =
             PlayerSnapshotCollector(
@@ -196,8 +206,63 @@ class PluginBootstrap(
         )
 
         /*
-         * Minecraft listeners.
+         * Society subsystem.
          */
+
+        val settlementObservationCollector =
+            SettlementObservationCollector(
+                plugin
+            )
+
+        registry.registerSettlementObservationCollector(
+            settlementObservationCollector
+        )
+
+        val settlementObservationEngine =
+            SettlementObservationEngine()
+
+        registry.registerSettlementObservationEngine(
+            settlementObservationEngine
+        )
+
+        val societyStateStore =
+            SocietyStateStore()
+
+        registry.registerSocietyStateStore(
+            societyStateStore
+        )
+
+        val factionRelationService =
+            FactionRelationService()
+
+        registry.registerFactionRelationService(
+            factionRelationService
+        )
+
+        val settlementObservationCoordinator =
+            SettlementObservationCoordinator(
+                plugin = plugin,
+                coroutineEngine = coroutineEngine,
+                collector =
+                    settlementObservationCollector,
+                engine =
+                    settlementObservationEngine,
+                stateStore =
+                    societyStateStore,
+                updateIntervalMillis = {
+                    configurationManager
+                        .societyObservationIntervalMillis()
+                }
+            )
+
+        registry.registerSettlementObservationCoordinator(
+            settlementObservationCoordinator
+        )
+
+        /*
+         * Minecraft event listeners.
+         */
+
         plugin.server.pluginManager.registerEvents(
             PlayerBehaviourListener(
                 buffer = behaviourEventBuffer
@@ -206,8 +271,21 @@ class PluginBootstrap(
         )
 
         /*
+         * Debug command.
+         */
+
+        plugin.getCommand(
+            "society"
+        )?.setExecutor(
+            SocietyDebugCommand(
+                societyStateStore
+            )
+        )
+
+        /*
          * Start enabled systems.
          */
+
         if (
             configurationManager
                 .isBehaviourEnabled()
@@ -229,32 +307,15 @@ class PluginBootstrap(
             worldIntelligenceCoordinator.start()
         }
 
-        plugin.logger.info(
-            "Configuration system initialized."
-        )
+        if (
+            configurationManager
+                .isSocietyEnabled()
+        ) {
+            settlementObservationCoordinator.start()
+        }
 
         plugin.logger.info(
-            "Coroutine engine initialized."
-        )
-
-        plugin.logger.info(
-            "Behaviour systems initialized."
-        )
-
-        plugin.logger.info(
-            "Ecosystem engine initialized."
-        )
-
-        plugin.logger.info(
-            "World snapshot collector initialized."
-        )
-
-        plugin.logger.info(
-            "World intelligence engine initialized."
-        )
-
-        plugin.logger.info(
-            "World intelligence coordinator started."
+            "All enabled MythicInvasion subsystems initialized."
         )
 
         return registry
