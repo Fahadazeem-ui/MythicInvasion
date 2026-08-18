@@ -1,5 +1,6 @@
 package io.github.mindzard.mythicinvasion.infrastructure.paper.command
 
+import io.github.mindzard.mythicinvasion.application.society.PillagerStrategyStore
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialStore
 import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
 import org.bukkit.Bukkit
@@ -7,11 +8,11 @@ import org.bukkit.ChatColor
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
-import java.util.UUID
 
 class SocietyDebugCommand(
     private val societyStateStore: SocietyStateStore,
-    private val socialStore: SettlementSocialStore
+    private val socialStore: SettlementSocialStore,
+    private val pillagerStrategyStore: PillagerStrategyStore
 ) : CommandExecutor {
 
     override fun onCommand(
@@ -34,6 +35,18 @@ class SocietyDebugCommand(
             )
         }
 
+        if (
+            args.isNotEmpty() &&
+            args[0].equals(
+                "pillagers",
+                ignoreCase = true
+            )
+        ) {
+            return handlePillagerLookup(
+                sender
+            )
+        }
+
         return handleOverview(
             sender
         )
@@ -47,7 +60,8 @@ class SocietyDebugCommand(
             societyStateStore.current()
 
         val socialProfiles =
-            socialStore.snapshot()
+            socialStore
+                .snapshot()
                 .associateBy {
                     it.settlementId
                 }
@@ -124,7 +138,9 @@ class SocietyDebugCommand(
                         )
                 )
 
-                if (social != null) {
+                if (
+                    social != null
+                ) {
 
                     sender.sendMessage(
                         "${ChatColor.GRAY}" +
@@ -173,12 +189,114 @@ class SocietyDebugCommand(
         return true
     }
 
+    private fun handlePillagerLookup(
+        sender: CommandSender
+    ): Boolean {
+
+        val state =
+            societyStateStore.current()
+
+        val strategy =
+            pillagerStrategyStore.current()
+
+        val faction =
+            state.factions[
+                "pillagers"
+            ]
+
+        sender.sendMessage(
+            "${ChatColor.DARK_RED}" +
+                "=== Pillager Faction Intelligence ==="
+        )
+
+        sender.sendMessage(
+            "${ChatColor.GRAY}" +
+                "Population: " +
+                (faction?.population ?: 0)
+        )
+
+        sender.sendMessage(
+            "${ChatColor.GRAY}" +
+                "Military Strength: " +
+                formatPercent(
+                    faction?.militaryStrength
+                        ?: 0.0
+                )
+        )
+
+        sender.sendMessage(
+            "${ChatColor.GRAY}" +
+                "Influence: " +
+                formatPercent(
+                    faction?.influence
+                        ?: 0.0
+                )
+        )
+
+        val targetName =
+            strategy.selectedSettlementName
+
+        if (
+            targetName == null
+        ) {
+
+            sender.sendMessage(
+                "${ChatColor.GRAY}" +
+                    "Target: None"
+            )
+
+            sender.sendMessage(
+                "${ChatColor.GRAY}" +
+                    "Reason: " +
+                    strategy.targetReason
+            )
+
+            return true
+        }
+
+        sender.sendMessage(
+            "${ChatColor.RED}" +
+                "Target: " +
+                targetName
+        )
+
+        sender.sendMessage(
+            "${ChatColor.GRAY}" +
+                "Target Score: " +
+                formatPercent(
+                    strategy.targetScore
+                )
+        )
+
+        sender.sendMessage(
+            "${ChatColor.GRAY}" +
+                "Reason: " +
+                strategy.targetReason
+        )
+
+        sender.sendMessage(
+            "${ChatColor.GRAY}" +
+                "Pressure Units: " +
+                strategy.assignedPillagerCount
+        )
+
+        sender.sendMessage(
+            "${ChatColor.GRAY}" +
+                "Scout Units: " +
+                strategy.scoutingPillagerCount
+        )
+
+        return true
+    }
+
     private fun handlePlayerLookup(
         sender: CommandSender,
         args: Array<out String>
     ): Boolean {
 
-        if (args.size < 2) {
+        if (
+            args.size < 2
+        ) {
 
             sender.sendMessage(
                 "${ChatColor.RED}" +
@@ -203,7 +321,10 @@ class SocietyDebugCommand(
             societyStateStore.current()
 
         sender.sendMessage(
-            "${ChatColor.GOLD}=== Society Profile: $targetName ==="
+            "${ChatColor.GOLD}" +
+                "=== Society Profile: " +
+                targetName +
+                " ==="
         )
 
         var found =
@@ -216,13 +337,16 @@ class SocietyDebugCommand(
             .forEach { settlement ->
 
                 val relations =
-                    socialStore.snapshot()
+                    socialStore
+                        .snapshot()
                         .firstOrNull {
                             it.settlementId ==
                                 settlement.settlementId
                         }
 
-                if (relations == null) {
+                if (
+                    relations == null
+                ) {
                     return@forEach
                 }
 
@@ -275,7 +399,10 @@ class SocietyDebugCommand(
                         standing
                 )
 
-                if (trust != null) {
+                if (
+                    trust != null
+                ) {
+
                     sender.sendMessage(
                         "${ChatColor.GRAY}" +
                             "  Trust: " +
@@ -285,7 +412,10 @@ class SocietyDebugCommand(
                     )
                 }
 
-                if (hostile != null) {
+                if (
+                    hostile != null
+                ) {
+
                     sender.sendMessage(
                         "${ChatColor.GRAY}" +
                             "  Threat: " +
@@ -296,7 +426,10 @@ class SocietyDebugCommand(
                 }
             }
 
-        if (!found) {
+        if (
+            !found
+        ) {
+
             sender.sendMessage(
                 "${ChatColor.GRAY}" +
                     "No recorded relationship with this player."
@@ -310,6 +443,10 @@ class SocietyDebugCommand(
         value: Double
     ): String {
 
-        return "${"%.0f".format(value * 100.0)}%"
+        return "${
+            "%.0f".format(
+                value * 100.0
+            )
+        }%"
     }
 }
