@@ -42,9 +42,9 @@ import io.github.mindzard.mythicinvasion.config.ConfigurationManager
 import io.github.mindzard.mythicinvasion.infrastructure.ai.GeminiStrategyClient
 import io.github.mindzard.mythicinvasion.infrastructure.paper.ai.HostileMobStrategyListener
 import io.github.mindzard.mythicinvasion.infrastructure.paper.command.SocietyDebugCommand
+import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.AnimalBehaviourListener
 import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.PlayerSnapshotCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.player.PlayerBehaviourListener
-import io.github.mindzard.mythicinvasion.infrastructure.paper.ecosystem.AnimalBehaviourListener
 import io.github.mindzard.mythicinvasion.infrastructure.paper.society.SettlementObservationCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.society.VillagerObservationCollector
 import io.github.mindzard.mythicinvasion.infrastructure.paper.society.VillagerRelationshipCollector
@@ -459,9 +459,18 @@ class PluginBootstrap(
             strategyCooldownStore
         )
 
+        /*
+         * =========================================================
+         * AI STRATEGY LAYER
+         * =========================================================
+         */
+
         if (
             configurationManager.isAiEnabled() &&
-            configurationManager.aiProvider() == "gemini"
+            configurationManager.aiProvider() == "gemini" &&
+            !configurationManager
+                .aiApiKey()
+                .isNullOrBlank()
         ) {
 
             val aiContextAssembler =
@@ -534,7 +543,24 @@ class PluginBootstrap(
             )
 
             aiStrategyCoordinator.start()
+
+            plugin.logger.info(
+                "Gemini AI strategy subsystem initialized."
+            )
+
+        } else {
+
+            plugin.logger.info(
+                "Gemini AI strategy subsystem is disabled " +
+                    "because it is not fully configured."
+            )
         }
+
+        /*
+         * =========================================================
+         * ADAPTIVE HOSTILE TARGETING
+         * =========================================================
+         */
 
         if (
             configurationManager
@@ -625,6 +651,12 @@ class PluginBootstrap(
             pillagerFactionCoordinator
         )
 
+        /*
+         * =========================================================
+         * MINECRAFT EVENT LISTENERS
+         * =========================================================
+         */
+
         plugin.server.pluginManager.registerEvents(
             AnimalBehaviourListener(
                 plugin =
@@ -641,6 +673,12 @@ class PluginBootstrap(
             plugin
         )
 
+        /*
+         * =========================================================
+         * DEBUG COMMAND
+         * =========================================================
+         */
+
         plugin.getCommand(
             "society"
         )?.setExecutor(
@@ -654,10 +692,17 @@ class PluginBootstrap(
             )
         )
 
+        /*
+         * =========================================================
+         * START ENABLED SYSTEMS
+         * =========================================================
+         */
+
         if (
             configurationManager
                 .isBehaviourEnabled()
         ) {
+
             behaviourProcessor.start()
         }
 
@@ -665,6 +710,7 @@ class PluginBootstrap(
             configurationManager
                 .isEcosystemEnabled()
         ) {
+
             ecosystemCoordinator.start()
         }
 
@@ -672,6 +718,7 @@ class PluginBootstrap(
             configurationManager
                 .isWorldIntelligenceEnabled()
         ) {
+
             worldIntelligenceCoordinator.start()
         }
 
