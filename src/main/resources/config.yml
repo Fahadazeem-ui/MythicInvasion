@@ -3,8 +3,15 @@ plugin:
 
 ecosystem:
   enabled: true
-
   update-interval-ticks: 20
+
+behaviour:
+  enabled: true
+
+  processing-interval-millis: 1000
+
+  decay:
+    half-life-minutes: 30
 
 ai:
   enabled: false
