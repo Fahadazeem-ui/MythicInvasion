@@ -21,7 +21,6 @@ import io.github.mindzard.mythicinvasion.application.society.SettlementSocialCoo
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialEngine
 import io.github.mindzard.mythicinvasion.application.society.SettlementSocialStore
 import io.github.mindzard.mythicinvasion.application.society.SocietyStateStore
-import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipCollector
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipCoordinator
 import io.github.mindzard.mythicinvasion.application.society.VillagerRelationshipStore
 import io.github.mindzard.mythicinvasion.application.society.VillagerSocietyCoordinator
