@@ -11,7 +11,8 @@ class BehaviourProcessor(
     private val plugin: JavaPlugin,
     private val coroutineEngine: CoroutineEngine,
     private val buffer: BehaviourEventBuffer,
-    private val profileStore: BehaviourProfileStore
+    private val profileStore: BehaviourProfileStore,
+    private val featureEngine: BehaviourFeatureEngine
 ) {
 
     private var processingJob: Job? = null
@@ -30,10 +31,7 @@ class BehaviourProcessor(
                 )
 
                 if (events.isNotEmpty()) {
-
-                    for (event in events) {
-                        profileStore.apply(event)
-                    }
+                    processBatch(events)
 
                     plugin.logger.fine(
                         "Processed ${events.size} behaviour events. " +
@@ -47,21 +45,53 @@ class BehaviourProcessor(
     }
 
     fun stop() {
+
         processingJob?.cancel()
         processingJob = null
 
         /*
-         * Process whatever is still available before shutdown.
-         *
-         * This operation only touches our own Kotlin data structures,
-         * so it does not require the Minecraft main thread.
+         * Drain pending events before shutdown.
          */
         val remainingEvents = buffer.drain(
             maxEvents = 100_000
         )
 
-        for (event in remainingEvents) {
+        if (remainingEvents.isNotEmpty()) {
+            processBatch(
+                remainingEvents
+            )
+
+            plugin.logger.fine(
+                "Processed ${remainingEvents.size} pending " +
+                    "behaviour events during shutdown."
+            )
+        }
+    }
+
+    private fun processBatch(
+        events: List<io.github.mindzard.mythicinvasion.domain.behaviour.BehaviourEvent>
+    ) {
+
+        for (event in events) {
             profileStore.apply(event)
         }
+
+        /*
+         * Only recalculate profiles that were actually affected by
+         * the current batch.
+         *
+         * Distinct UUIDs prevent unnecessary duplicate calculations.
+         */
+        events
+            .asSequence()
+            .map { it.playerId }
+            .distinct()
+            .forEach { playerId ->
+
+                profileStore.recalculateFeatures(
+                    playerId = playerId,
+                    featureEngine = featureEngine
+                )
+            }
     }
 }
