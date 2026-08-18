@@ -24,17 +24,12 @@ behaviour:
 
 ai:
   enabled: true
-
   provider: gemini
-
   model: gemini-3.6-flash
-
+  api-key: ""
   minimum-confidence: 0.65
-
   strategy-interval-millis: 60000
-
   request-timeout-millis: 30000
-
   max-context-characters: 12000
 
 database:
