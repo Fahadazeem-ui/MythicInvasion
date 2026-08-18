@@ -55,6 +55,9 @@ class SettlementObservationEngine {
             population =
                 population,
 
+            guardCount =
+                observation.ironGolemCount,
+
             foodLevel =
                 1.0,
 
@@ -89,10 +92,7 @@ class SettlementObservationEngine {
 
         return (
             0.35 +
-                (
-                    guardCoverage *
-                        0.65
-                    )
+                guardCoverage * 0.65
             )
             .coerceIn(
                 0.0,
@@ -107,23 +107,19 @@ class SettlementObservationEngine {
 
         val populationSignal =
             (
-                villagerCount /
-                    20.0
-                )
-                .coerceIn(
-                    0.0,
-                    1.0
-                )
+                villagerCount / 20.0
+            ).coerceIn(
+                0.0,
+                1.0
+            )
 
         val protectionSignal =
             (
-                ironGolemCount /
-                    3.0
-                )
-                .coerceIn(
-                    0.0,
-                    1.0
-                )
+                ironGolemCount / 3.0
+            ).coerceIn(
+                0.0,
+                1.0
+            )
 
         return (
             populationSignal * 0.75 +
