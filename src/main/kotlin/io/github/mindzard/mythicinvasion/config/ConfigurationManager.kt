@@ -71,6 +71,15 @@ class ConfigurationManager(
             .coerceAtLeast(2_000L)
     }
 
+    fun villagerAnalysisIntervalMillis(): Long {
+        return configuration
+            .getLong(
+                "society.villager-analysis-interval-millis",
+                10_000L
+            )
+            .coerceAtLeast(2_000L)
+    }
+
     fun isBehaviourEnabled(): Boolean {
         return configuration.getBoolean(
             "behaviour.enabled",
