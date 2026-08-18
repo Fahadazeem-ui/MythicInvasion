@@ -27,7 +27,8 @@ class MythicInvasionPlugin : JavaPlugin() {
             val bootstrap =
                 PluginBootstrap(this)
 
-            services = bootstrap.start()
+            services =
+                bootstrap.start()
 
             logger.info(
                 "MythicInvasion started successfully."
@@ -45,7 +46,9 @@ class MythicInvasionPlugin : JavaPlugin() {
 
             exception.printStackTrace()
 
-            server.pluginManager.disablePlugin(this)
+            server.pluginManager.disablePlugin(
+                this
+            )
         }
     }
 
@@ -59,48 +62,40 @@ class MythicInvasionPlugin : JavaPlugin() {
 
             try {
 
-                /*
-                 * Stop behaviour processing first so that pending
-                 * in-memory observations can be consumed.
-                 */
                 services.behaviourProcessor.stop()
 
                 logger.info(
                     "Behaviour processor stopped."
                 )
 
-                /*
-                 * Stop ecosystem processing.
-                 */
+                services.worldIntelligenceCoordinator.stop()
+
+                logger.info(
+                    "World intelligence coordinator stopped."
+                )
+
                 services.ecosystemCoordinator.stop()
 
                 logger.info(
                     "Ecosystem coordinator stopped."
                 )
 
-                /*
-                 * Stop plugin-owned asynchronous work.
-                 */
                 services.coroutineEngine.shutdown()
 
                 logger.info(
                     "Coroutine engine stopped."
                 )
 
-                /*
-                 * Clear behaviour data.
-                 */
                 services.behaviourProfileStore.clear()
 
                 services.behaviourEventBuffer.clear()
 
-                /*
-                 * Clear AI-facing intelligence data.
-                 */
                 services.behaviourIntelligenceStore.clear()
 
+                services.worldStateStore.reset()
+
                 logger.info(
-                    "Behaviour and intelligence memory cleared."
+                    "All in-memory intelligence state cleared."
                 )
 
             } catch (exception: Exception) {
