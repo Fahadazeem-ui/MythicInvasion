@@ -3,9 +3,9 @@ package io.github.mindzard.mythicinvasion.application.intelligence
 import io.github.mindzard.mythicinvasion.domain.behaviour.BehaviourFeatures
 import io.github.mindzard.mythicinvasion.domain.behaviour.PlayerBehaviourProfile
 import io.github.mindzard.mythicinvasion.domain.intelligence.BehaviourArchetype
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import java.util.UUID
 
 class BehaviourIntelligenceEngineTest {
@@ -14,7 +14,7 @@ class BehaviourIntelligenceEngineTest {
         BehaviourIntelligenceEngine()
 
     @Test
-    fun `miner-heavy profile should identify miner as dominant`() {
+    fun minerHeavyProfileShouldIdentifyMinerAsDominant() {
 
         val playerId =
             UUID.randomUUID()
@@ -46,14 +46,15 @@ class BehaviourIntelligenceEngineTest {
         assertTrue(
             result.score(
                 BehaviourArchetype.MINER
-            ) > result.score(
-                BehaviourArchetype.BUILDER
-            )
+            ) >
+                result.score(
+                    BehaviourArchetype.BUILDER
+                )
         )
     }
 
     @Test
-    fun `confidence should increase with more observations`() {
+    fun confidenceShouldIncreaseWithMoreObservations() {
 
         val playerId =
             UUID.randomUUID()
@@ -89,7 +90,7 @@ class BehaviourIntelligenceEngineTest {
     }
 
     @Test
-    fun `scores should remain inside normalized range`() {
+    fun scoresShouldRemainInsideNormalizedRange() {
 
         val playerId =
             UUID.randomUUID()
