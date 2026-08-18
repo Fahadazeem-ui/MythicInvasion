@@ -23,7 +23,7 @@ behaviour:
     half-life-minutes: 30
 
 ai:
-  enabled: false
+  enabled: true
 
   provider: gemini
 
