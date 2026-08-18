@@ -3,15 +3,25 @@ package io.github.mindzard.mythicinvasion.application.society
 import io.github.mindzard.mythicinvasion.concurrency.CoroutineEngine
 import io.github.mindzard.mythicinvasion.domain.society.FactionState
 import io.github.mindzard.mythicinvasion.domain.society.FactionType
+import io.github.mindzard.mythicinvasion.domain.society.PillagerStrategyState
+import io.github.mindzard.mythicinvasion.domain.society.SettlementState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.bukkit.Location
 import org.bukkit.NamespacedKey
+import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Pillager
+import org.bukkit.entity.Player
+import org.bukkit.entity.Villager
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
+import kotlin.math.PI
+import kotlin.math.absoluteValue
+import kotlin.math.cos
 import kotlin.math.min
+import kotlin.math.sin
 
 class PillagerFactionCoordinator(
     private val plugin: JavaPlugin,
@@ -35,17 +45,61 @@ class PillagerFactionCoordinator(
         private const val MODE_KEY =
             "strategy_mode"
 
+        private const val PHASE_KEY =
+            "strategy_phase"
+
+        private const val ASSIGNED_AT_KEY =
+            "strategy_assigned_at"
+
         private const val SCOUT_MODE =
             "SCOUT"
 
         private const val PRESSURE_MODE =
             "PRESSURE"
+
+        private const val SCOUT_PHASE =
+            "SCOUTING"
+
+        private const val PRESSURE_PHASE =
+            "PRESSURE"
+
+        private const val REGROUP_PHASE =
+            "REGROUPING"
+
+        private const val TARGET_STICKINESS =
+            0.10
+
+        private const val RETARGET_INTERVAL_MILLIS =
+            30_000L
+
+        private const val MAX_ASSIGNED_UNITS =
+            12
+
+        private const val MAX_SCOUT_UNITS =
+            3
+
+        private const val APPROACH_DISTANCE =
+            18.0
+
+        private const val SCOUT_RING_DISTANCE =
+            32.0
+
+        private const val SCOUT_SPEED =
+            0.75
+
+        private const val PRESSURE_SPEED =
+            0.90
+
+        private const val REGROUP_SPEED =
+            0.85
     }
 
     private var job: Job? = null
 
     private lateinit var targetSettlementKey: NamespacedKey
     private lateinit var strategyModeKey: NamespacedKey
+    private lateinit var strategyPhaseKey: NamespacedKey
+    private lateinit var assignedAtKey: NamespacedKey
 
     fun start() {
 
@@ -67,11 +121,23 @@ class PillagerFactionCoordinator(
                 MODE_KEY
             )
 
+        strategyPhaseKey =
+            NamespacedKey(
+                plugin,
+                PHASE_KEY
+            )
+
+        assignedAtKey =
+            NamespacedKey(
+                plugin,
+                ASSIGNED_AT_KEY
+            )
+
         job =
             coroutineEngine.scope.launch {
 
                 plugin.logger.info(
-                    "Pillager faction strategy started."
+                    "Pillager faction intelligence started."
                 )
 
                 while (
@@ -120,7 +186,7 @@ class PillagerFactionCoordinator(
         strategyStore.clear()
 
         plugin.logger.info(
-            "Pillager faction strategy stopped."
+            "Pillager faction intelligence stopped."
         )
     }
 
@@ -140,6 +206,9 @@ class PillagerFactionCoordinator(
                         Pillager::class.java
                     )
                 }
+                .filter {
+                    !it.isDead
+                }
 
         updateFactionState(
             pillagerCount =
@@ -147,12 +216,31 @@ class PillagerFactionCoordinator(
         )
 
         if (
-            settlements.isEmpty() ||
+            settlements.isEmpty()
+        ) {
+
+            clearEntityStrategyTags()
+
+            strategyStore.update(
+                PillagerStrategyState(
+                    targetReason =
+                        "No settlements detected.",
+                    updatedAtMillis =
+                        System.currentTimeMillis()
+                )
+            )
+
+            return
+        }
+
+        if (
             pillagers.isEmpty()
         ) {
 
             strategyStore.update(
-                io.github.mindzard.mythicinvasion.domain.society.PillagerStrategyState(
+                PillagerStrategyState(
+                    targetReason =
+                        "No active pillagers available.",
                     updatedAtMillis =
                         System.currentTimeMillis()
                 )
@@ -162,19 +250,22 @@ class PillagerFactionCoordinator(
         }
 
         val socialProfiles =
-            socialStore.snapshot()
+            socialStore
+                .snapshot()
                 .associateBy {
                     it.settlementId
                 }
 
-        val scored =
+        val scoredSettlements =
             settlements
                 .map { settlement ->
 
                     val nearbyPillagers =
                         countNearbyPillagers(
-                            settlement,
-                            pillagers
+                            settlement =
+                                settlement,
+                            pillagers =
+                                pillagers
                         )
 
                     targetingEngine.score(
@@ -190,54 +281,77 @@ class PillagerFactionCoordinator(
                             nearbyPillagers
                     )
                 }
-
-        val selected =
-            scored
-                .maxByOrNull {
+                .sortedByDescending {
                     it.score
                 }
 
+        val selectedScore =
+            chooseStableTarget(
+                scoredSettlements =
+                    scoredSettlements
+            )
+
         if (
-            selected == null
+            selectedScore == null
         ) {
+
+            clearEntityStrategyTags()
+
+            strategyStore.update(
+                PillagerStrategyState(
+                    targetReason =
+                        "No viable strategic target.",
+                    updatedAtMillis =
+                        System.currentTimeMillis()
+                )
+            )
+
             return
         }
 
         val selectedSettlement =
             settlements.firstOrNull {
                 it.settlementId ==
-                    selected.settlementId
+                    selectedScore.settlementId
             }
                 ?: return
 
-        val assignments =
-            assignPillagers(
+        val previousState =
+            strategyStore.current()
+
+        val targetChanged =
+            previousState.selectedSettlementId !=
+                selectedSettlement.settlementId
+
+        val assignment =
+            assignAndCommandUnits(
                 pillagers =
                     pillagers,
-
                 settlement =
-                    selectedSettlement
+                    selectedSettlement,
+                targetScore =
+                    selectedScore.score
             )
 
         strategyStore.update(
-            io.github.mindzard.mythicinvasion.domain.society.PillagerStrategyState(
+            PillagerStrategyState(
                 selectedSettlementId =
-                    selected.settlementId,
+                    selectedSettlement.settlementId,
 
                 selectedSettlementName =
                     selectedSettlement.name,
 
                 targetScore =
-                    selected.score,
+                    selectedScore.score,
 
                 targetReason =
-                    selected.reason,
+                    selectedScore.reason,
 
                 assignedPillagerCount =
-                    assignments.pressure,
+                    assignment.pressureUnits,
 
                 scoutingPillagerCount =
-                    assignments.scout,
+                    assignment.scoutUnits,
 
                 updatedAtMillis =
                     System.currentTimeMillis()
@@ -245,88 +359,88 @@ class PillagerFactionCoordinator(
         )
 
         if (
-            plugin.config.getBoolean(
-                "plugin.debug",
-                false
-            )
+            targetChanged &&
+            debugEnabled()
         ) {
 
             plugin.logger.info(
-                "Pillager target selected: " +
+                "Pillager faction target changed to " +
                     selectedSettlement.name +
                     " | score=" +
                     "%.2f".format(
-                        selected.score
+                        selectedScore.score
                     ) +
                     " | reason=" +
-                    selected.reason +
+                    selectedScore.reason +
+                    " | scouts=" +
+                    assignment.scoutUnits +
                     " | pressure=" +
-                    assignments.pressure +
-                    " | scout=" +
-                    assignments.scout
+                    assignment.pressureUnits
             )
         }
     }
 
-    private fun countNearbyPillagers(
-        settlement:
-            io.github.mindzard.mythicinvasion
-                .domain.society.SettlementState,
-        pillagers:
-            List<Pillager>
-    ): Int {
+    private fun chooseStableTarget(
+        scoredSettlements:
+            List<PillagerSettlementTargetScore>
+    ): PillagerSettlementTargetScore? {
 
-        val radius =
-            min(
-                assignmentRadius,
-                settlement.radius * 2.0
-            )
+        val best =
+            scoredSettlements.firstOrNull()
+                ?: return null
 
-        val radiusSquared =
-            radius * radius
+        val currentId =
+            strategyStore.current()
+                .selectedSettlementId
+                ?: return best
 
-        return pillagers.count { pillager ->
+        val current =
+            scoredSettlements
+                .firstOrNull {
+                    it.settlementId ==
+                        currentId
+                }
+                ?: return best
 
-            if (
-                pillager.world.name !=
-                settlement.worldName
-            ) {
-                return@count false
-            }
+        val targetAge =
+            System.currentTimeMillis() -
+                strategyStore.current()
+                    .updatedAtMillis
 
-            val location =
-                pillager.location
+        if (
+            targetAge >=
+                RETARGET_INTERVAL_MILLIS
+        ) {
+            return best
+        }
 
-            val dx =
-                location.x -
-                    settlement.centerX
+        if (
+            best.settlementId ==
+                current.settlementId
+        ) {
+            return current
+        }
 
-            val dy =
-                location.y -
-                    settlement.centerY
-
-            val dz =
-                location.z -
-                    settlement.centerZ
-
-            (
-                dx * dx +
-                    dy * dy +
-                    dz * dz
-                ) <=
-                radiusSquared
+        return if (
+            best.score -
+                current.score >=
+                TARGET_STICKINESS
+        ) {
+            best
+        } else {
+            current
         }
     }
 
-    private fun assignPillagers(
+    private fun assignAndCommandUnits(
         pillagers:
             List<Pillager>,
         settlement:
-            io.github.mindzard.mythicinvasion
-                .domain.society.SettlementState
+            SettlementState,
+        targetScore: Double
     ): AssignmentResult {
 
-        val candidates =
+        val nearby =
             pillagers
                 .filter {
                     it.world.name ==
@@ -334,25 +448,16 @@ class PillagerFactionCoordinator(
                 }
                 .map { pillager ->
 
-                    val dx =
-                        pillager.location.x -
-                            settlement.centerX
-
-                    val dy =
-                        pillager.location.y -
-                            settlement.centerY
-
-                    val dz =
-                        pillager.location.z -
-                            settlement.centerZ
-
-                    val distanceSquared =
-                        dx * dx +
-                            dy * dy +
-                            dz * dz
+                    val distance =
+                        distanceSquared(
+                            pillager.location,
+                            settlementCenter(
+                                settlement
+                            )
+                        )
 
                     pillager to
-                        distanceSquared
+                        distance
                 }
                 .filter {
                     it.second <=
@@ -363,68 +468,457 @@ class PillagerFactionCoordinator(
                     it.second
                 }
 
-        /*
-         * We do not force every pillager in the world to join
-         * one target. Only nearby units receive the strategy.
-         */
-        val selectedUnits =
-            candidates.take(
-                12
+        val selected =
+            nearby.take(
+                MAX_ASSIGNED_UNITS
             )
 
         if (
-            selectedUnits.isEmpty()
+            selected.isEmpty()
         ) {
+
+            clearEntityStrategyTagsForOthers(
+                selectedIds =
+                    emptySet(),
+                allPillagers =
+                    pillagers
+            )
+
             return AssignmentResult()
         }
 
         val scoutCount =
             min(
-                3,
-                selectedUnits.size
+                MAX_SCOUT_UNITS,
+                selected.size
             )
 
-        selectedUnits.forEachIndexed {
-                index,
-                pair ->
+        val scoutIds =
+            selected
+                .take(
+                    scoutCount
+                )
+                .map {
+                    it.first.uniqueId
+                }
+                .toSet()
+
+        val assignedIds =
+            selected
+                .map {
+                    it.first.uniqueId
+                }
+                .toSet()
+
+        var scoutUnits =
+            0
+
+        var pressureUnits =
+            0
+
+        selected.forEach { pair ->
 
             val pillager =
                 pair.first
 
+            val scout =
+                pillager.uniqueId in
+                    scoutIds
+
             val mode =
                 if (
-                    index < scoutCount
+                    scout
                 ) {
                     SCOUT_MODE
                 } else {
                     PRESSURE_MODE
                 }
 
-            pillager
-                .persistentDataContainer
-                .set(
-                    targetSettlementKey,
-                    PersistentDataType.STRING,
-                    settlement.settlementId
-                )
+            val phase =
+                when {
 
-            pillager
-                .persistentDataContainer
-                .set(
-                    strategyModeKey,
-                    PersistentDataType.STRING,
-                    mode
-                )
+                    scout ->
+                        SCOUT_PHASE
+
+                    targetScore >=
+                        0.65 ->
+                        PRESSURE_PHASE
+
+                    else ->
+                        REGROUP_PHASE
+                }
+
+            writeStrategyMemory(
+                pillager =
+                    pillager,
+                settlementId =
+                    settlement.settlementId,
+                mode =
+                    mode,
+                phase =
+                    phase
+            )
+
+            when (
+                phase
+            ) {
+
+                SCOUT_PHASE -> {
+
+                    scoutUnits++
+
+                    executeScoutBehaviour(
+                        pillager =
+                            pillager,
+                        settlement =
+                            settlement
+                    )
+                }
+
+                PRESSURE_PHASE -> {
+
+                    pressureUnits++
+
+                    executePressureBehaviour(
+                        pillager =
+                            pillager,
+                        settlement =
+                            settlement
+                    )
+                }
+
+                REGROUP_PHASE -> {
+
+                    executeRegroupBehaviour(
+                        pillager =
+                            pillager,
+                        settlement =
+                            settlement
+                    )
+                }
+            }
         }
 
-        return AssignmentResult(
-            pressure =
-                selectedUnits.size -
-                    scoutCount,
-
-            scout =
-                scoutCount
+        clearEntityStrategyTagsForOthers(
+            selectedIds =
+                assignedIds,
+            allPillagers =
+                pillagers
         )
+
+        return AssignmentResult(
+            pressureUnits =
+                pressureUnits,
+            scoutUnits =
+                scoutUnits
+        )
+    }
+
+    private fun executeScoutBehaviour(
+        pillager: Pillager,
+        settlement: SettlementState
+    ) {
+
+        val scoutLocation =
+            calculateScoutLocation(
+                pillagerIndex =
+                    stableIndex(
+                        pillager.uniqueId
+                    ),
+                settlement =
+                    settlement
+            )
+
+        if (
+            distanceSquared(
+                pillager.location,
+                scoutLocation
+            ) > 9.0
+        ) {
+
+            pillager.pathfinder.moveTo(
+                scoutLocation,
+                SCOUT_SPEED
+            )
+        }
+
+        keepVanillaCombatAwareness(
+            pillager =
+                pillager,
+            settlement =
+                settlement
+        )
+    }
+
+    private fun executePressureBehaviour(
+        pillager: Pillager,
+        settlement: SettlementState
+    ) {
+
+        val nearbyTarget =
+            findNearbySettlementTarget(
+                pillager =
+                    pillager,
+                settlement =
+                    settlement
+            )
+
+        if (
+            nearbyTarget != null
+        ) {
+
+            if (
+                distanceSquared(
+                    pillager.location,
+                    nearbyTarget.location
+                ) > 16.0
+            ) {
+
+                pillager.pathfinder.moveTo(
+                    nearbyTarget.location,
+                    PRESSURE_SPEED
+                )
+            }
+
+            pillager.lookAt(
+                nearbyTarget
+            )
+
+            return
+        }
+
+        val center =
+            settlementCenter(
+                settlement
+            )
+
+        if (
+            distanceSquared(
+                pillager.location,
+                center
+            ) >
+            APPROACH_DISTANCE *
+                APPROACH_DISTANCE
+        ) {
+
+            pillager.pathfinder.moveTo(
+                center,
+                PRESSURE_SPEED
+            )
+        }
+    }
+
+    private fun executeRegroupBehaviour(
+        pillager: Pillager,
+        settlement: SettlementState
+    ) {
+
+        val center =
+            settlementCenter(
+                settlement
+            )
+
+        if (
+            distanceSquared(
+                pillager.location,
+                center
+            ) >
+            APPROACH_DISTANCE *
+                APPROACH_DISTANCE
+        ) {
+
+            pillager.pathfinder.moveTo(
+                center,
+                REGROUP_SPEED
+            )
+        }
+
+        pillager.target = null
+    }
+
+    private fun keepVanillaCombatAwareness(
+        pillager: Pillager,
+        settlement: SettlementState
+    ) {
+
+        val target =
+            findNearbySettlementTarget(
+                pillager =
+                    pillager,
+                settlement =
+                    settlement
+            )
+
+        if (
+            target != null
+        ) {
+
+            pillager.lookAt(
+                target
+            )
+        }
+    }
+
+    private fun findNearbySettlementTarget(
+        pillager: Pillager,
+        settlement: SettlementState
+    ): LivingEntity? {
+
+        val center =
+            settlementCenter(
+                settlement
+            )
+
+        val nearby =
+            pillager.world
+                .getNearbyEntities(
+                    pillager.location,
+                    20.0,
+                    12.0,
+                    20.0
+                )
+
+        val player =
+            nearby
+                .asSequence()
+                .filterIsInstance<Player>()
+                .filter {
+                    it.isOnline &&
+                        !it.isDead
+                }
+                .filter {
+                    distanceSquared(
+                        it.location,
+                        center
+                    ) <=
+                        (
+                            settlement.radius +
+                                8
+                            ) *
+                        (
+                            settlement.radius +
+                                8
+                            )
+                }
+                .minByOrNull {
+                    distanceSquared(
+                        it.location,
+                        pillager.location
+                    )
+                }
+
+        if (
+            player != null
+        ) {
+            return player
+        }
+
+        return nearby
+            .asSequence()
+            .filterIsInstance<Villager>()
+            .filter {
+                !it.isDead
+            }
+            .filter {
+                distanceSquared(
+                    it.location,
+                    center
+                ) <=
+                    (
+                        settlement.radius +
+                            8
+                        ) *
+                    (
+                        settlement.radius +
+                            8
+                        )
+            }
+            .minByOrNull {
+                distanceSquared(
+                    it.location,
+                    pillager.location
+                )
+            }
+    }
+
+    private fun calculateScoutLocation(
+        pillagerIndex: Int,
+        settlement: SettlementState
+    ): Location {
+
+        val center =
+            settlementCenter(
+                settlement
+            )
+
+        val ringDistance =
+            min(
+                SCOUT_RING_DISTANCE,
+                settlement.radius.toDouble()
+            )
+
+        val slot =
+            pillagerIndex %
+                3
+
+        val angle =
+            (
+                2.0 *
+                    PI /
+                    3.0
+                ) *
+                slot
+
+        return Location(
+            center.world,
+            center.x +
+                cos(angle) *
+                ringDistance,
+            center.y,
+            center.z +
+                sin(angle) *
+                ringDistance
+        )
+    }
+
+    private fun writeStrategyMemory(
+        pillager: Pillager,
+        settlementId: String,
+        mode: String,
+        phase: String
+    ) {
+
+        pillager
+            .persistentDataContainer
+            .set(
+                targetSettlementKey,
+                PersistentDataType.STRING,
+                settlementId
+            )
+
+        pillager
+            .persistentDataContainer
+            .set(
+                strategyModeKey,
+                PersistentDataType.STRING,
+                mode
+            )
+
+        pillager
+            .persistentDataContainer
+            .set(
+                strategyPhaseKey,
+                PersistentDataType.STRING,
+                phase
+            )
+
+        pillager
+            .persistentDataContainer
+            .set(
+                assignedAtKey,
+                PersistentDataType.LONG,
+                System.currentTimeMillis()
+            )
     }
 
     private fun clearEntityStrategyTags() {
@@ -438,26 +932,77 @@ class PillagerFactionCoordinator(
                 .getEntitiesByClass(
                     Pillager::class.java
                 )
-                .forEach { pillager ->
-
-                    pillager
-                        .persistentDataContainer
-                        .remove(
-                            targetSettlementKey
-                        )
-
-                    pillager
-                        .persistentDataContainer
-                        .remove(
-                            strategyModeKey
-                        )
+                .forEach {
+                    clearStrategyMemory(
+                        it
+                    )
                 }
+        }
+    }
+
+    private fun clearEntityStrategyTagsForOthers(
+        selectedIds:
+            Set<java.util.UUID>,
+        allPillagers:
+            List<Pillager>
+    ) {
+
+        allPillagers.forEach { pillager ->
+
+            if (
+                pillager.uniqueId !in
+                    selectedIds
+            ) {
+
+                clearStrategyMemory(
+                    pillager
+                )
+            }
+        }
+    }
+
+    private fun clearStrategyMemory(
+        pillager: Pillager
+    ) {
+
+        if (
+            ::targetSettlementKey.isInitialized
+        ) {
+
+            pillager
+                .persistentDataContainer
+                .remove(
+                    targetSettlementKey
+                )
+
+            pillager
+                .persistentDataContainer
+                .remove(
+                    strategyModeKey
+                )
+
+            pillager
+                .persistentDataContainer
+                .remove(
+                    strategyPhaseKey
+                )
+
+            pillager
+                .persistentDataContainer
+                .remove(
+                    assignedAtKey
+                )
         }
     }
 
     private fun updateFactionState(
         pillagerCount: Int
     ) {
+
+        val targetScore =
+            strategyStore
+                .current()
+                .targetScore
 
         val militaryStrength =
             min(
@@ -487,9 +1032,7 @@ class PillagerFactionCoordinator(
                     militaryStrength,
 
                 influence =
-                    strategyStore
-                        .current()
-                        .targetScore,
+                    targetScore,
 
                 lastUpdatedMillis =
                     System.currentTimeMillis()
@@ -497,8 +1040,111 @@ class PillagerFactionCoordinator(
         )
     }
 
+    private fun settlementCenter(
+        settlement: SettlementState
+    ): Location {
+
+        val world =
+            plugin.server.getWorld(
+                settlement.worldName
+            )
+                ?: return plugin.server
+                    .worlds
+                    .first()
+                    .spawnLocation
+
+        return Location(
+            world,
+            settlement.centerX.toDouble(),
+            settlement.centerY.toDouble(),
+            settlement.centerZ.toDouble()
+        )
+    }
+
+    private fun countNearbyPillagers(
+        settlement: SettlementState,
+        pillagers: List<Pillager>
+    ): Int {
+
+        val center =
+            settlementCenter(
+                settlement
+            )
+
+        val radius =
+            min(
+                assignmentRadius,
+                settlement.radius * 2.0
+            )
+
+        val radiusSquared =
+            radius * radius
+
+        return pillagers.count { pillager ->
+
+            pillager.world.uid ==
+                center.world.uid &&
+                distanceSquared(
+                    pillager.location,
+                    center
+                ) <=
+                radiusSquared
+        }
+    }
+
+    private fun distanceSquared(
+        first: Location,
+        second: Location
+    ): Double {
+
+        if (
+            first.world.uid !=
+                second.world.uid
+        ) {
+            return Double.MAX_VALUE
+        }
+
+        val dx =
+            first.x -
+                second.x
+
+        val dy =
+            first.y -
+                second.y
+
+        val dz =
+            first.z -
+                second.z
+
+        return (
+            dx * dx +
+                dy * dy +
+                dz * dz
+            )
+    }
+
+    private fun stableIndex(
+        id: java.util.UUID
+    ): Int {
+
+        return (
+            id.mostSignificantBits xor
+                id.leastSignificantBits
+            )
+            .toInt()
+            .absoluteValue
+    }
+
+    private fun debugEnabled(): Boolean {
+
+        return plugin.config.getBoolean(
+            "plugin.debug",
+            false
+        )
+    }
+
     private data class AssignmentResult(
-        val pressure: Int = 0,
-        val scout: Int = 0
+        val pressureUnits: Int = 0,
+        val scoutUnits: Int = 0
     )
 }
