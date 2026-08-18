@@ -2,6 +2,7 @@ package io.github.mindzard.mythicinvasion.bootstrap
 
 import io.github.mindzard.mythicinvasion.MythicInvasionPlugin
 import io.github.mindzard.mythicinvasion.application.ai.AiContextAssembler
+import io.github.mindzard.mythicinvasion.application.ai.AiDecisionValidator
 import io.github.mindzard.mythicinvasion.application.ai.AiStrategyCoordinator
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourDecayEngine
 import io.github.mindzard.mythicinvasion.application.behaviour.BehaviourEventBuffer
@@ -48,16 +49,8 @@ class PluginBootstrap(
         val registry =
             ServiceRegistry()
 
-        /*
-         * =========================================================
-         * CORE CONFIGURATION
-         * =========================================================
-         */
-
         val configurationManager =
-            ConfigurationManager(
-                plugin
-            )
+            ConfigurationManager(plugin)
 
         configurationManager.load()
 
@@ -65,40 +58,22 @@ class PluginBootstrap(
             configurationManager
         )
 
-        /*
-         * =========================================================
-         * COROUTINE ENGINE
-         * =========================================================
-         */
-
         val coroutineEngine =
-            CoroutineEngine(
-                plugin
-            )
+            CoroutineEngine(plugin)
 
         registry.registerCoroutineEngine(
             coroutineEngine
         )
 
-        /*
-         * =========================================================
-         * ECOSYSTEM SUBSYSTEM
-         * =========================================================
-         */
-
         val playerSnapshotCollector =
-            PlayerSnapshotCollector(
-                plugin
-            )
+            PlayerSnapshotCollector(plugin)
 
         registry.registerPlayerSnapshotCollector(
             playerSnapshotCollector
         )
 
         val ecosystemEngine =
-            EcosystemEngine(
-                plugin
-            )
+            EcosystemEngine(plugin)
 
         registry.registerEcosystemEngine(
             ecosystemEngine
@@ -122,12 +97,6 @@ class PluginBootstrap(
         registry.registerEcosystemCoordinator(
             ecosystemCoordinator
         )
-
-        /*
-         * =========================================================
-         * PLAYER BEHAVIOUR SUBSYSTEM
-         * =========================================================
-         */
 
         val behaviourEventBuffer =
             BehaviourEventBuffer()
@@ -178,10 +147,14 @@ class PluginBootstrap(
         val behaviourProcessor =
             BehaviourProcessor(
                 plugin = plugin,
-                coroutineEngine = coroutineEngine,
-                buffer = behaviourEventBuffer,
-                profileStore = behaviourProfileStore,
-                featureEngine = behaviourFeatureEngine,
+                coroutineEngine =
+                    coroutineEngine,
+                buffer =
+                    behaviourEventBuffer,
+                profileStore =
+                    behaviourProfileStore,
+                featureEngine =
+                    behaviourFeatureEngine,
                 intelligenceStore =
                     behaviourIntelligenceStore,
                 processingIntervalMillis = {
@@ -193,12 +166,6 @@ class PluginBootstrap(
         registry.registerBehaviourProcessor(
             behaviourProcessor
         )
-
-        /*
-         * =========================================================
-         * WORLD INTELLIGENCE SUBSYSTEM
-         * =========================================================
-         */
 
         val worldSnapshotCollector =
             WorldSnapshotCollector(
@@ -225,8 +192,10 @@ class PluginBootstrap(
 
         val worldIntelligenceCoordinator =
             WorldIntelligenceCoordinator(
-                plugin = plugin,
-                coroutineEngine = coroutineEngine,
+                plugin =
+                    plugin,
+                coroutineEngine =
+                    coroutineEngine,
                 collector =
                     worldSnapshotCollector,
                 engine =
@@ -242,12 +211,6 @@ class PluginBootstrap(
         registry.registerWorldIntelligenceCoordinator(
             worldIntelligenceCoordinator
         )
-
-        /*
-         * =========================================================
-         * SETTLEMENT SUBSYSTEM
-         * =========================================================
-         */
 
         val settlementObservationCollector =
             SettlementObservationCollector(
@@ -281,8 +244,10 @@ class PluginBootstrap(
 
         val settlementObservationCoordinator =
             SettlementObservationCoordinator(
-                plugin = plugin,
-                coroutineEngine = coroutineEngine,
+                plugin =
+                    plugin,
+                coroutineEngine =
+                    coroutineEngine,
                 collector =
                     settlementObservationCollector,
                 engine =
@@ -298,12 +263,6 @@ class PluginBootstrap(
         registry.registerSettlementObservationCoordinator(
             settlementObservationCoordinator
         )
-
-        /*
-         * =========================================================
-         * VILLAGER SOCIETY SUBSYSTEM
-         * =========================================================
-         */
 
         val villagerObservationCollector =
             VillagerObservationCollector(
@@ -330,8 +289,10 @@ class PluginBootstrap(
 
         val villagerSocietyCoordinator =
             VillagerSocietyCoordinator(
-                plugin = plugin,
-                coroutineEngine = coroutineEngine,
+                plugin =
+                    plugin,
+                coroutineEngine =
+                    coroutineEngine,
                 collector =
                     villagerObservationCollector,
                 engine =
@@ -350,18 +311,13 @@ class PluginBootstrap(
             villagerSocietyCoordinator
         )
 
-        /*
-         * =========================================================
-         * VILLAGER ↔ PLAYER RELATIONSHIP SUBSYSTEM
-         * =========================================================
-         */
-
         val villagerRelationshipEngine =
             VillagerRelationshipEngine()
 
         val villagerRelationshipCollector =
             VillagerRelationshipCollector(
-                plugin = plugin,
+                plugin =
+                    plugin,
                 engine =
                     villagerRelationshipEngine
             )
@@ -379,8 +335,10 @@ class PluginBootstrap(
 
         val villagerRelationshipCoordinator =
             VillagerRelationshipCoordinator(
-                plugin = plugin,
-                coroutineEngine = coroutineEngine,
+                plugin =
+                    plugin,
+                coroutineEngine =
+                    coroutineEngine,
                 collector =
                     villagerRelationshipCollector,
                 stateStore =
@@ -396,12 +354,6 @@ class PluginBootstrap(
         registry.registerVillagerRelationshipCoordinator(
             villagerRelationshipCoordinator
         )
-
-        /*
-         * =========================================================
-         * SETTLEMENT SOCIAL INTELLIGENCE
-         * =========================================================
-         */
 
         val settlementSocialEngine =
             SettlementSocialEngine()
@@ -419,8 +371,10 @@ class PluginBootstrap(
 
         val settlementSocialCoordinator =
             SettlementSocialCoordinator(
-                plugin = plugin,
-                coroutineEngine = coroutineEngine,
+                plugin =
+                    plugin,
+                coroutineEngine =
+                    coroutineEngine,
                 relationshipStore =
                     villagerRelationshipStore,
                 engine =
@@ -439,22 +393,8 @@ class PluginBootstrap(
 
         /*
          * =========================================================
-         * AI STRATEGY SUBSYSTEM
+         * AI STRATEGY LAYER
          * =========================================================
-         *
-         * AI remains optional.
-         *
-         * When ai.enabled=false:
-         * - no Gemini client is created
-         * - no API request is made
-         * - no external network call occurs
-         *
-         * When ai.enabled=true and provider=gemini:
-         * - the existing player/world/society state is assembled
-         * - Gemini receives a bounded strategic context
-         * - Gemini returns a high-level strategy
-         *
-         * Gemini does NOT directly control Minecraft entities.
          */
 
         if (
@@ -478,9 +418,17 @@ class PluginBootstrap(
                 aiContextAssembler
             )
 
+            val aiDecisionValidator =
+                AiDecisionValidator()
+
+            registry.registerAiDecisionValidator(
+                aiDecisionValidator
+            )
+
             val geminiStrategyClient =
                 GeminiStrategyClient(
-                    plugin = plugin,
+                    plugin =
+                        plugin,
                     model =
                         configurationManager.aiModel(),
                     timeoutMillis =
@@ -494,13 +442,16 @@ class PluginBootstrap(
 
             val aiStrategyCoordinator =
                 AiStrategyCoordinator(
-                    plugin = plugin,
+                    plugin =
+                        plugin,
                     coroutineEngine =
                         coroutineEngine,
                     contextAssembler =
                         aiContextAssembler,
                     geminiClient =
                         geminiStrategyClient,
+                    validator =
+                        aiDecisionValidator,
                     updateIntervalMillis = {
                         configurationManager
                             .aiStrategyIntervalMillis()
@@ -528,9 +479,7 @@ class PluginBootstrap(
         }
 
         /*
-         * =========================================================
-         * MINECRAFT EVENT LISTENERS
-         * =========================================================
+         * Minecraft event listeners.
          */
 
         plugin.server.pluginManager.registerEvents(
@@ -542,9 +491,7 @@ class PluginBootstrap(
         )
 
         /*
-         * =========================================================
-         * DEBUG COMMAND
-         * =========================================================
+         * Debug command.
          */
 
         plugin.getCommand(
@@ -559,16 +506,13 @@ class PluginBootstrap(
         )
 
         /*
-         * =========================================================
-         * START ENABLED SUBSYSTEMS
-         * =========================================================
+         * Start enabled systems.
          */
 
         if (
             configurationManager
                 .isBehaviourEnabled()
         ) {
-
             behaviourProcessor.start()
         }
 
@@ -576,7 +520,6 @@ class PluginBootstrap(
             configurationManager
                 .isEcosystemEnabled()
         ) {
-
             ecosystemCoordinator.start()
         }
 
@@ -584,7 +527,6 @@ class PluginBootstrap(
             configurationManager
                 .isWorldIntelligenceEnabled()
         ) {
-
             worldIntelligenceCoordinator.start()
         }
 
@@ -592,13 +534,9 @@ class PluginBootstrap(
             configurationManager
                 .isSocietyEnabled()
         ) {
-
             settlementObservationCoordinator.start()
-
             villagerSocietyCoordinator.start()
-
             villagerRelationshipCoordinator.start()
-
             settlementSocialCoordinator.start()
         }
 
